@@ -1,0 +1,18 @@
+扩展作者与来源（依照各扩展清单记录，未标注不代表权利归属已确认）
+扩展移植自用户提供的 QQ Agent 生态素材。原始素材未附 LICENSE，分发前须逐项确认授权；详见 EXTENSIONS.md。
+- 群友好感度：QQ Agent 用户（extensions/plugins/affinity/plugin.json）
+- 连发合并（等他说完再一起看）：QQ Agent + DSH（extensions/plugins/burst-merge/plugin.json）
+- 上下文插话判定：本机定制（extensions/plugins/context-chime/plugin.json）
+- 跨会话认人：QQ Agent（对应 0.2 的跨会话记忆断层）（extensions/plugins/cross-chat-link/plugin.json）
+- 群友花费统计：QQ Agent（extensions/plugins/group-cost-report/plugin.json）
+- 自己上网：自建（按 QQ Agent 插件 API v1）（extensions/plugins/self-surf/plugin.json）
+- Agent Reach：qqagent-ext（extensions/skills/agent-reach/skill.json）
+- API 余额告急乞讨：QQ Agent 用户（extensions/skills/api-beggar/skill.json）
+- 去除 AI 味：小肥鱼（extensions/skills/deai-flavor/skill.json）
+- 小本本（人情账）：本地自建（extensions/skills/ledger/skill.json）
+- 表情品味：本地自建（extensions/skills/meme-taste/skill.json）
+- 小鲸鱼的空间与个人资料：本地自建（extensions/skills/qq-self/skill.json）
+- QQ空间：明（extensions/skills/qzone/skill.json）
+- 回复配图·梗鲸表情包：nuoxi4n（extensions/skills/reply-meme/skill.json）
+- 搜图发图：作者未标注（extensions/skills/search-image/skill.json）
+- 智能配图：作者未标注（extensions/skills/smart-image/skill.json）
