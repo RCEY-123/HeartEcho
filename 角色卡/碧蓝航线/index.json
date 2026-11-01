@@ -1,0 +1,196 @@
+{
+  "format": "HeartEcho-native-character-card",
+  "version": "1.0.0",
+  "characters": [
+    {
+      "id": "azurlane-laffey",
+      "name": "拉菲",
+      "category": "角色卡",
+      "series": "碧蓝航线",
+      "path": "laffey/azurlane-laffey.json",
+      "readme": "laffey/README.md",
+      "sha256": "cd9bd3cb161de569b99581c8c0760ecd519f8f69e47a588a1101a0a180071e80",
+      "archive": "HeartEcho-AzurLane-laffey-v1.zip"
+    },
+    {
+      "id": "azurlane-javelin",
+      "name": "标枪",
+      "category": "角色卡",
+      "series": "碧蓝航线",
+      "path": "javelin/azurlane-javelin.json",
+      "readme": "javelin/README.md",
+      "sha256": "e14ef35715802fff9e566fb17a42ed0eaa0d0277b24b98ad634889a1d2a3c9af",
+      "archive": "HeartEcho-AzurLane-javelin-v1.zip"
+    },
+    {
+      "id": "azurlane-z23",
+      "name": "Z23",
+      "category": "角色卡",
+      "series": "碧蓝航线",
+      "path": "z23/azurlane-z23.json",
+      "readme": "z23/README.md",
+      "sha256": "bfdd6a2218143b00a1cf9f4cd1a69f98428c94aa4b47872628ec7300838b4b11",
+      "archive": "HeartEcho-AzurLane-z23-v1.zip"
+    },
+    {
+      "id": "azurlane-shimakaze",
+      "name": "岛风",
+      "category": "角色卡",
+      "series": "碧蓝航线",
+      "path": "shimakaze/azurlane-shimakaze.json",
+      "readme": "shimakaze/README.md",
+      "sha256": "40f3076c6a9c6c5d6d09c6e1317d72fdbd5171dc3df18a6137f300cacf9bd44e",
+      "archive": "HeartEcho-AzurLane-shimakaze-v1.zip"
+    },
+    {
+      "id": "azurlane-unicorn",
+      "name": "独角兽",
+      "category": "角色卡",
+      "series": "碧蓝航线",
+      "path": "unicorn/azurlane-unicorn.json",
+      "readme": "unicorn/README.md",
+      "sha256": "c8954e45f1da7dc88f1fd204cf9055ce66ad0a5b20cd83ade5ca6b27361c5855",
+      "archive": "HeartEcho-AzurLane-unicorn-v1.zip"
+    },
+    {
+      "id": "azurlane-le-malin",
+      "name": "恶毒",
+      "category": "角色卡",
+      "series": "碧蓝航线",
+      "path": "le-malin/azurlane-le-malin.json",
+      "readme": "le-malin/README.md",
+      "sha256": "569b083e6df6c3b717f05c73b0d06fdcb59dd003c880c3903ea9b87407eb53a0",
+      "archive": "HeartEcho-AzurLane-le-malin-v1.zip"
+    },
+    {
+      "id": "azurlane-eldridge",
+      "name": "埃尔德里奇",
+      "category": "角色卡",
+      "series": "碧蓝航线",
+      "path": "eldridge/azurlane-eldridge.json",
+      "readme": "eldridge/README.md",
+      "sha256": "9fca8b877f10a47ad1cdc0ba9f1b22dc4352720935a736f7b74d8abc616f3286",
+      "archive": "HeartEcho-AzurLane-eldridge-v1.zip"
+    },
+    {
+      "id": "azurlane-new-jersey",
+      "name": "新泽西",
+      "category": "角色卡",
+      "series": "碧蓝航线",
+      "path": "new-jersey/azurlane-new-jersey.json",
+      "readme": "new-jersey/README.md",
+      "sha256": "03fb160336c05a120b521c8e057a564684d51f6d229bc6131ce5c527cd0ce23c",
+      "archive": "HeartEcho-AzurLane-new-jersey-v1.zip"
+    },
+    {
+      "id": "azurlane-shinano",
+      "name": "信浓",
+      "category": "角色卡",
+      "series": "碧蓝航线",
+      "path": "shinano/azurlane-shinano.json",
+      "readme": "shinano/README.md",
+      "sha256": "1de67f7e020df7a621ac295c3ae8673befbc6582361fd32c330a19d07d49b8b1",
+      "archive": "HeartEcho-AzurLane-shinano-v1.zip"
+    },
+    {
+      "id": "azurlane-musashi",
+      "name": "武藏",
+      "category": "角色卡",
+      "series": "碧蓝航线",
+      "path": "musashi/azurlane-musashi.json",
+      "readme": "musashi/README.md",
+      "sha256": "c25e46b37c60cf537b5a76a2cab0d94021972c623083806262355be78aacd2b2",
+      "archive": "HeartEcho-AzurLane-musashi-v1.zip"
+    },
+    {
+      "id": "azurlane-takao",
+      "name": "高雄",
+      "category": "角色卡",
+      "series": "碧蓝航线",
+      "path": "takao/azurlane-takao.json",
+      "readme": "takao/README.md",
+      "sha256": "642044c6813c3fead8aca151309aa1ed21bc330d3385bad86b4b2d9cbdabcebf",
+      "archive": "HeartEcho-AzurLane-takao-v1.zip"
+    },
+    {
+      "id": "azurlane-belfast",
+      "name": "贝尔法斯特",
+      "category": "角色卡",
+      "series": "碧蓝航线",
+      "path": "belfast/azurlane-belfast.json",
+      "readme": "belfast/README.md",
+      "sha256": "2641ef2f4812f37cf38b437c37607e8cb2fc9143fc9f2c9fdca200d2d5dfc3b7",
+      "archive": "HeartEcho-AzurLane-belfast-v1.zip"
+    },
+    {
+      "id": "azurlane-illustrious",
+      "name": "光辉",
+      "category": "角色卡",
+      "series": "碧蓝航线",
+      "path": "illustrious/azurlane-illustrious.json",
+      "readme": "illustrious/README.md",
+      "sha256": "bcc263349400a98d558505353c297efead3cc2d56796bdb6b0c2b95d26c2f410",
+      "archive": "HeartEcho-AzurLane-illustrious-v1.zip"
+    },
+    {
+      "id": "azurlane-alsace",
+      "name": "阿尔萨斯",
+      "category": "角色卡",
+      "series": "碧蓝航线",
+      "path": "alsace/azurlane-alsace.json",
+      "readme": "alsace/README.md",
+      "sha256": "775a2e5a4e4781671b45da36adcf0c734629934c93751cc05f73ed7ef6b25345",
+      "archive": "HeartEcho-AzurLane-alsace-v1.zip"
+    },
+    {
+      "id": "azurlane-lion",
+      "name": "狮",
+      "category": "角色卡",
+      "series": "碧蓝航线",
+      "path": "lion/azurlane-lion.json",
+      "readme": "lion/README.md",
+      "sha256": "0381a0f14b6ac40e28e9e941d1de68ba2fa6b6cb6c966b64b7d30686fe9050b4",
+      "archive": "HeartEcho-AzurLane-lion-v1.zip"
+    },
+    {
+      "id": "azurlane-jervis",
+      "name": "贾维斯",
+      "category": "角色卡",
+      "series": "碧蓝航线",
+      "path": "jervis/azurlane-jervis.json",
+      "readme": "jervis/README.md",
+      "sha256": "5875e1ce0fa70098feee0dd195a1570a23f22c442760e70f565b917635690df2",
+      "archive": "HeartEcho-AzurLane-jervis-v1.zip"
+    },
+    {
+      "id": "azurlane-janus",
+      "name": "雅努斯",
+      "category": "角色卡",
+      "series": "碧蓝航线",
+      "path": "janus/azurlane-janus.json",
+      "readme": "janus/README.md",
+      "sha256": "358c6437f0b284476339975316309a0277fe7335c4b78b39a07497564fc48434",
+      "archive": "HeartEcho-AzurLane-janus-v1.zip"
+    },
+    {
+      "id": "azurlane-tashkent",
+      "name": "塔什干",
+      "category": "角色卡",
+      "series": "碧蓝航线",
+      "path": "tashkent/azurlane-tashkent.json",
+      "readme": "tashkent/README.md",
+      "sha256": "1820572925c4f577edc8b8154668ccfb03cbf84b8f4cbc4ff5ecbeda7ffd17a7",
+      "archive": "HeartEcho-AzurLane-tashkent-v1.zip"
+    },
+    {
+      "id": "azurlane-sovetsky-soyuz",
+      "name": "苏维埃同盟",
+      "category": "角色卡",
+      "series": "碧蓝航线",
+      "path": "sovetsky-soyuz/azurlane-sovetsky-soyuz.json",
+      "readme": "sovetsky-soyuz/README.md",
+      "sha256": "4070d4a6a7183747bc167f78a0a7a5e5c99a909dcd012b666b2a454898d1616c",
+      "archive": "HeartEcho-AzurLane-sovetsky-soyuz-v1.zip"
+    }
+  ]
+}

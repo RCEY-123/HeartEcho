@@ -1,5 +1,7 @@
 # 心语 · HeartEcho
 
+[安装包与逐版更新说明](https://github.com/RCEY-123/HeartEcho/releases) · [最新 dev.5（通用版 / TB 分别安装）](https://github.com/RCEY-123/HeartEcho/releases/tag/v1.3.0-dev.5) · [角色卡专区：碧蓝航线 19 位角色](角色卡/README.md)
+
 新版本的记忆、互动与独立 TB 版见 [使用说明](docs/NEXT-VERSION.md)。本地开发可运行 `npm run test:next`；Windows 上用 Node 24 执行 `npm run package:tb` 生成独立 TB 便携目录。
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
