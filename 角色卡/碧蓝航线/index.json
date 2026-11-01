@@ -9,7 +9,7 @@
       "series": "碧蓝航线",
       "path": "laffey/azurlane-laffey.json",
       "readme": "laffey/README.md",
-      "sha256": "cd9bd3cb161de569b99581c8c0760ecd519f8f69e47a588a1101a0a180071e80",
+      "sha256": "d7ed02b068e35367c28db2cb1907a6af0c33354f04d74c952803ae69ba99663b",
       "archive": "HeartEcho-AzurLane-laffey-v1.zip"
     },
     {
@@ -19,7 +19,7 @@
       "series": "碧蓝航线",
       "path": "javelin/azurlane-javelin.json",
       "readme": "javelin/README.md",
-      "sha256": "e14ef35715802fff9e566fb17a42ed0eaa0d0277b24b98ad634889a1d2a3c9af",
+      "sha256": "6e1af4951fa5fb3af399d8d56211ee1c1b508da918d46fcd52189917b4e551ec",
       "archive": "HeartEcho-AzurLane-javelin-v1.zip"
     },
     {
@@ -29,7 +29,7 @@
       "series": "碧蓝航线",
       "path": "z23/azurlane-z23.json",
       "readme": "z23/README.md",
-      "sha256": "bfdd6a2218143b00a1cf9f4cd1a69f98428c94aa4b47872628ec7300838b4b11",
+      "sha256": "450043bb504906dfe7460282a6d655c59213c39e8366b6a91039e6ce68e0313c",
       "archive": "HeartEcho-AzurLane-z23-v1.zip"
     },
     {
@@ -39,7 +39,7 @@
       "series": "碧蓝航线",
       "path": "shimakaze/azurlane-shimakaze.json",
       "readme": "shimakaze/README.md",
-      "sha256": "40f3076c6a9c6c5d6d09c6e1317d72fdbd5171dc3df18a6137f300cacf9bd44e",
+      "sha256": "71feec826feb3157198f1edaf9442f3e56c0b39e9f4ed53a3ec7cb6f943cc08d",
       "archive": "HeartEcho-AzurLane-shimakaze-v1.zip"
     },
     {
@@ -49,7 +49,7 @@
       "series": "碧蓝航线",
       "path": "unicorn/azurlane-unicorn.json",
       "readme": "unicorn/README.md",
-      "sha256": "c8954e45f1da7dc88f1fd204cf9055ce66ad0a5b20cd83ade5ca6b27361c5855",
+      "sha256": "a17474b21d8f086e7a2e2af1867a29d06048fb7431f49bffae58006dda8f3f08",
       "archive": "HeartEcho-AzurLane-unicorn-v1.zip"
     },
     {
@@ -59,7 +59,7 @@
       "series": "碧蓝航线",
       "path": "le-malin/azurlane-le-malin.json",
       "readme": "le-malin/README.md",
-      "sha256": "569b083e6df6c3b717f05c73b0d06fdcb59dd003c880c3903ea9b87407eb53a0",
+      "sha256": "b6059c786a53275aeab9f51969c99182692ed51869fb7f1297aa5c209a14c1a8",
       "archive": "HeartEcho-AzurLane-le-malin-v1.zip"
     },
     {
@@ -69,7 +69,7 @@
       "series": "碧蓝航线",
       "path": "eldridge/azurlane-eldridge.json",
       "readme": "eldridge/README.md",
-      "sha256": "9fca8b877f10a47ad1cdc0ba9f1b22dc4352720935a736f7b74d8abc616f3286",
+      "sha256": "e80fe4120780b4ae49da016d653c4db902316b7ba1ccc335683e2f0f5d053e2e",
       "archive": "HeartEcho-AzurLane-eldridge-v1.zip"
     },
     {
@@ -79,7 +79,7 @@
       "series": "碧蓝航线",
       "path": "new-jersey/azurlane-new-jersey.json",
       "readme": "new-jersey/README.md",
-      "sha256": "03fb160336c05a120b521c8e057a564684d51f6d229bc6131ce5c527cd0ce23c",
+      "sha256": "f61f8b9f3f69b24ff5c23fca4cb654e12d507f74907fe764cabedd55a8f782ee",
       "archive": "HeartEcho-AzurLane-new-jersey-v1.zip"
     },
     {
@@ -89,7 +89,7 @@
       "series": "碧蓝航线",
       "path": "shinano/azurlane-shinano.json",
       "readme": "shinano/README.md",
-      "sha256": "1de67f7e020df7a621ac295c3ae8673befbc6582361fd32c330a19d07d49b8b1",
+      "sha256": "7133c20f55d01cbee0b4efd52067379cf1f6638a502a8424cf9977730cf51fc3",
       "archive": "HeartEcho-AzurLane-shinano-v1.zip"
     },
     {
@@ -99,7 +99,7 @@
       "series": "碧蓝航线",
       "path": "musashi/azurlane-musashi.json",
       "readme": "musashi/README.md",
-      "sha256": "c25e46b37c60cf537b5a76a2cab0d94021972c623083806262355be78aacd2b2",
+      "sha256": "6e7cb9469f2a6ab6a1c88e7dd759ed935625b8f54a981e2e8135fcaf1a475244",
       "archive": "HeartEcho-AzurLane-musashi-v1.zip"
     },
     {
@@ -109,7 +109,7 @@
       "series": "碧蓝航线",
       "path": "takao/azurlane-takao.json",
       "readme": "takao/README.md",
-      "sha256": "642044c6813c3fead8aca151309aa1ed21bc330d3385bad86b4b2d9cbdabcebf",
+      "sha256": "e4f468d361074c841dd9f4789767821108b8166673cc96a00b2a25e44f467a1e",
       "archive": "HeartEcho-AzurLane-takao-v1.zip"
     },
     {
@@ -119,7 +119,7 @@
       "series": "碧蓝航线",
       "path": "belfast/azurlane-belfast.json",
       "readme": "belfast/README.md",
-      "sha256": "2641ef2f4812f37cf38b437c37607e8cb2fc9143fc9f2c9fdca200d2d5dfc3b7",
+      "sha256": "256e8437ab965acedac432306658d003ff1e1d06e2c5a1b491ff55c164832206",
       "archive": "HeartEcho-AzurLane-belfast-v1.zip"
     },
     {
@@ -129,7 +129,7 @@
       "series": "碧蓝航线",
       "path": "illustrious/azurlane-illustrious.json",
       "readme": "illustrious/README.md",
-      "sha256": "bcc263349400a98d558505353c297efead3cc2d56796bdb6b0c2b95d26c2f410",
+      "sha256": "00a4454ece1ced310908b0ae129090ed42001b0631f09562bd16ba3437c9d00a",
       "archive": "HeartEcho-AzurLane-illustrious-v1.zip"
     },
     {
@@ -139,7 +139,7 @@
       "series": "碧蓝航线",
       "path": "alsace/azurlane-alsace.json",
       "readme": "alsace/README.md",
-      "sha256": "775a2e5a4e4781671b45da36adcf0c734629934c93751cc05f73ed7ef6b25345",
+      "sha256": "83a600e710d07833c7dea2959b4fa894a2f86ca98c17d6b565620f12364e29e9",
       "archive": "HeartEcho-AzurLane-alsace-v1.zip"
     },
     {
@@ -149,7 +149,7 @@
       "series": "碧蓝航线",
       "path": "lion/azurlane-lion.json",
       "readme": "lion/README.md",
-      "sha256": "0381a0f14b6ac40e28e9e941d1de68ba2fa6b6cb6c966b64b7d30686fe9050b4",
+      "sha256": "742f7a33c74375d42669fb21fde7c5b47530e79f3c5e0783b0ce17433ba84bdc",
       "archive": "HeartEcho-AzurLane-lion-v1.zip"
     },
     {
@@ -159,7 +159,7 @@
       "series": "碧蓝航线",
       "path": "jervis/azurlane-jervis.json",
       "readme": "jervis/README.md",
-      "sha256": "5875e1ce0fa70098feee0dd195a1570a23f22c442760e70f565b917635690df2",
+      "sha256": "9185d5e89abe9c7ab29535d0d56ba24b47ee4cf95c32d84228942b58c1a0b099",
       "archive": "HeartEcho-AzurLane-jervis-v1.zip"
     },
     {
@@ -169,7 +169,7 @@
       "series": "碧蓝航线",
       "path": "janus/azurlane-janus.json",
       "readme": "janus/README.md",
-      "sha256": "358c6437f0b284476339975316309a0277fe7335c4b78b39a07497564fc48434",
+      "sha256": "81f95bf8b65ddec633582cbbd8d8f92f4ddba8bebcf76c408fe86aece30408b5",
       "archive": "HeartEcho-AzurLane-janus-v1.zip"
     },
     {
@@ -179,7 +179,7 @@
       "series": "碧蓝航线",
       "path": "tashkent/azurlane-tashkent.json",
       "readme": "tashkent/README.md",
-      "sha256": "1820572925c4f577edc8b8154668ccfb03cbf84b8f4cbc4ff5ecbeda7ffd17a7",
+      "sha256": "946d98b99bdf40242f43ce9d2532d0aa6c3e2d864fec087174d2ffe47cf0def0",
       "archive": "HeartEcho-AzurLane-tashkent-v1.zip"
     },
     {
@@ -189,7 +189,7 @@
       "series": "碧蓝航线",
       "path": "sovetsky-soyuz/azurlane-sovetsky-soyuz.json",
       "readme": "sovetsky-soyuz/README.md",
-      "sha256": "4070d4a6a7183747bc167f78a0a7a5e5c99a909dcd012b666b2a454898d1616c",
+      "sha256": "16a2116977a5b5f62c4e630ed8b7402766c8f821e4ac11f0d83e4d5f135d4726",
       "archive": "HeartEcho-AzurLane-sovetsky-soyuz-v1.zip"
     }
   ]
