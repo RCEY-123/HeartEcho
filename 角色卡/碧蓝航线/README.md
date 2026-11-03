@@ -1,10 +1,14 @@
-# 碧蓝航线角色卡 · v1
+# 碧蓝航线角色卡 · v2
 
-19 位角色，每位均含基础人设、外貌特征、性格、说话风格、行为习惯、人际关系和三组原创说话示例，另附开场白、世界观及来源说明。适用于心语 / TB 的原生 JSON 角色格式。
+22 位角色，每位均含基础人设、外貌特征、性格、说话风格、行为习惯、人际关系和三组原创说话示例，另附开场白、世界观及来源说明。适用于心语 / TB 的原生 JSON 角色格式。
 
 这是非官方同人创作。外貌按本次用户提供的图片识别，原图未随包发布；身份与台词风格据游戏中文文本的第三方提取镜像核对，详见 [研究与来源范围](RESEARCH.md)。不是官方角色设定全集，不包含用户的聊天、记忆、账号或 API Key。
 
-[全部角色卡下载](https://github.com/RCEY-123/HeartEcho/releases/tag/character-cards-azurlane-v1) · [应用 dev.5 下载](https://github.com/RCEY-123/HeartEcho/releases/tag/v1.3.0-dev.5) · [逐角色目录](index.json)
+[全部角色卡下载](https://github.com/RCEY-123/HeartEcho/releases/tag/character-cards-azurlane-v2) · [应用 dev.5 下载](https://github.com/RCEY-123/HeartEcho/releases/tag/v1.3.0-dev.5) · [逐角色目录](index.json)
+
+## 本次新增
+
+敦刻尔克、列克星敦II、加斯科涅，各自独立提供 JSON、设定说明与来源。已有前 19 张卡的用户可只下载三人补充包 `HeartEcho-AzurLane-Additions-v2.zip`。原 19 张卡内容未改，完整 v2 总包共 22 张。新增资料见 [研究补充](RESEARCH-ADDITIONS.md)。
 
 | 角色 | 身份 | 单独下载 |
 | --- | --- | --- |
@@ -27,16 +31,19 @@
 | [雅努斯](janus/README.md) | 皇家 · J级驱逐舰 | [JSON](janus/azurlane-janus.json) · [独立压缩包](https://github.com/RCEY-123/HeartEcho/releases/download/character-cards-azurlane-v1/HeartEcho-AzurLane-janus-v1.zip) |
 | [塔什干](tashkent/README.md) | 北方联合 · 塔什干级驱逐领舰 | [JSON](tashkent/azurlane-tashkent.json) · [独立压缩包](https://github.com/RCEY-123/HeartEcho/releases/download/character-cards-azurlane-v1/HeartEcho-AzurLane-tashkent-v1.zip) |
 | [苏维埃同盟](sovetsky-soyuz/README.md) | 北方联合 · 23型战列舰首舰 | [JSON](sovetsky-soyuz/azurlane-sovetsky-soyuz.json) · [独立压缩包](https://github.com/RCEY-123/HeartEcho/releases/download/character-cards-azurlane-v1/HeartEcho-AzurLane-sovetsky-soyuz-v1.zip) |
+| [敦刻尔克](dunkerque/README.md) | 维希教廷 · 敦刻尔克级战列巡洋舰首舰 | [JSON](dunkerque/azurlane-dunkerque.json) · [独立压缩包](https://github.com/RCEY-123/HeartEcho/releases/download/character-cards-azurlane-v2/HeartEcho-AzurLane-dunkerque-v1.zip) |
+| [列克星敦II](lexington-ii/README.md) | 白鹰 · 埃塞克斯级航空母舰 | [JSON](lexington-ii/azurlane-lexington-ii.json) · [独立压缩包](https://github.com/RCEY-123/HeartEcho/releases/download/character-cards-azurlane-v2/HeartEcho-AzurLane-lexington-ii-v1.zip) |
+| [加斯科涅](gascogne/README.md) | 维希教廷 · 黎塞留级方案战列舰 · 特别计划舰 | [JSON](gascogne/azurlane-gascogne.json) · [独立压缩包](https://github.com/RCEY-123/HeartEcho/releases/download/character-cards-azurlane-v2/HeartEcho-AzurLane-gascogne-v1.zip) |
 
 ## 导入方法
 
 **只导入角色 JSON，不用重新安装应用，也不要使用安装器的「导入旧数据」。** 后者用于迁移整套应用数据，不适用于单张角色卡。
 
-1. 在发布页下载 `HeartEcho-AzurLane-CharacterCards-v1.zip` 并解压。里面的 `characters` 文件夹集中放了 19 张 JSON；只想使用一个角色，可下载该角色独立压缩包。直接在 GitHub 打开 JSON 时请用 **Raw / Download raw file** 保存，不能把网页另存为 JSON。
+1. 在发布页下载 `HeartEcho-AzurLane-CharacterCards-v2.zip` 并解压。里面的 `characters` 文件夹集中放了 22 张 JSON；只想使用一个角色，可下载该角色独立压缩包。直接在 GitHub 打开 JSON 时请用 **Raw / Download raw file** 保存，不能把网页另存为 JSON。
 2. 启动需要导入的那一版心语，在面板左下角查看当前**数据目录**。也可到「运行环境」核对设置；若设置框留空，以左下角实际路径为准。多实例用户应先切到目标实例再查看。通用版与 TB 版需要分别操作，不能凭猜测复制到程序目录。
 3. 记下该目录后，**完全退出应用及托盘进程**。建议先用「运行环境」的完整数据导出保存一份现有数据备份，妥善保管，不要上传到公共仓库。
 4. 在资源管理器打开刚记下的数据目录，进入其中的 `characters` 子文件夹。如果没有这个子文件夹，先确认是否找错路径，不要选择空目录、安装目录或 `app` 目录来代替。至少完成一次应用初始化后再检查。
-5. 将所需的 `azurlane-*.json` 文件复制到这个 `characters` 文件夹中。全部导入时只复制总包 `characters` 里面的 19 个文件；单独导入时复制独立包中的一张 JSON。**不要把外层角色文件夹或 ZIP 直接放进去，不要复制 `index.json`。**
+5. 将所需的 `azurlane-*.json` 文件复制到这个 `characters` 文件夹中。全部导入时只复制总包 `characters` 里面的 22 个文件；单独导入时复制独立包中的一张 JSON。**不要把外层角色文件夹或 ZIP 直接放进去，不要复制 `index.json`。**
 6. 如遇同名文件，选择**跳过**，不要覆盖现有角色。该前缀用于减少与自建卡冲突，但如果以前装过本套角色卡，请先比较内容并备份。不要为解决冲突随意改名：文件名应与 JSON 内的 `id` 一致。
 7. 重新启动应用，进入「角色工作室」选择相应角色，检查「外貌特征」等七项均已显示。头像留空，可自行选用你持有的立绘；再到「角色对话」选择角色发送消息。若角色选择器尚未刷新，可重新打开面板。
 8. 首次使用先在「模型与资费」填写**自己的 API Key** 并测试模型连接。应用内聊天不需要 SnowLuma；QQ 聊天才需要另行接入协议端。

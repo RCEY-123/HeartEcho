@@ -1,6 +1,6 @@
 {
   "format": "HeartEcho-native-character-card",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "characters": [
     {
       "id": "azurlane-laffey",
@@ -191,6 +191,39 @@
       "readme": "sovetsky-soyuz/README.md",
       "sha256": "16a2116977a5b5f62c4e630ed8b7402766c8f821e4ac11f0d83e4d5f135d4726",
       "archive": "HeartEcho-AzurLane-sovetsky-soyuz-v1.zip"
+    },
+    {
+      "id": "azurlane-dunkerque",
+      "name": "敦刻尔克",
+      "category": "角色卡",
+      "series": "碧蓝航线",
+      "path": "dunkerque/azurlane-dunkerque.json",
+      "readme": "dunkerque/README.md",
+      "sha256": "1c52d8d81b04393a08292a70e699f20bf0365860a635b3372b9a66d27890fd2d",
+      "archive": "HeartEcho-AzurLane-dunkerque-v1.zip",
+      "releaseTag": "character-cards-azurlane-v2"
+    },
+    {
+      "id": "azurlane-lexington-ii",
+      "name": "列克星敦II",
+      "category": "角色卡",
+      "series": "碧蓝航线",
+      "path": "lexington-ii/azurlane-lexington-ii.json",
+      "readme": "lexington-ii/README.md",
+      "sha256": "313da5629b2bee013e198d0dfca627d35ad4b0fcf14df3693b86cd7e71a8683f",
+      "archive": "HeartEcho-AzurLane-lexington-ii-v1.zip",
+      "releaseTag": "character-cards-azurlane-v2"
+    },
+    {
+      "id": "azurlane-gascogne",
+      "name": "加斯科涅",
+      "category": "角色卡",
+      "series": "碧蓝航线",
+      "path": "gascogne/azurlane-gascogne.json",
+      "readme": "gascogne/README.md",
+      "sha256": "0ad80f39451f93e5d2b4118fd150386b87d832c4ff242d330bad3a95c5bfe284",
+      "archive": "HeartEcho-AzurLane-gascogne-v1.zip",
+      "releaseTag": "character-cards-azurlane-v2"
     }
   ]
 }
