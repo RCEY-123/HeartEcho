@@ -1,0 +1,53 @@
+{
+  "name": "heartecho",
+  "version": "1.3.0-dev.7",
+  "private": true,
+  "type": "module",
+  "description": "心语 · HeartEcho：可直接在本机聊天的数字伴侣，也支持接入 QQ。角色人格、长期记忆、数字生命、主动提醒与插件技能；零第三方运行时依赖（Node 内置模块 + node:sqlite）",
+  "main": "index.mjs",
+  "keywords": [
+    "qq-bot",
+    "onebot",
+    "chatbot",
+    "persona",
+    "long-term-memory",
+    "nodejs"
+  ],
+  "license": "AGPL-3.0-only",
+  "author": "RCEY-123",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "start": "node index.mjs",
+    "tray": "node index.mjs --tray",
+    "probe": "node index.mjs --probe",
+    "selftest": "node tools/selftest.mjs",
+    "test:extensions": "node tools/extensions-test.mjs",
+    "gen:extensions": "node tools/gen-extensions.mjs",
+    "test:security": "node --test tools/security-test.mjs",
+    "test:next": "node --test tools/next-version-test.mjs",
+    "test:local": "node --test tools/local-chat-test.mjs",
+    "test:local:browser": "node --test tools/local-chat-browser-test.mjs",
+    "test:qq": "node --test tools/qq-recovery-test.mjs tools/qq-catchup-test.mjs tools/protocol-connection-test.mjs",
+    "test:updates": "node --test tools/updates-test.mjs tools/chat-composer-test.mjs",
+    "package:tb": "node tools/package-tb.mjs",
+    "smoke": "node tools/smoke.mjs",
+    "build:exe": "node tools/build-exe.mjs",
+    "check:pages": "node tools/check-pages.mjs",
+    "e2e": "node tools/e2e-live.mjs",
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix --max-warnings=0",
+    "format": "prettier --write . && node tools/format-ui.mjs --write",
+    "format:check": "prettier --check . && node tools/format-ui.mjs --check",
+    "test:tooling": "node --test tools/tooling-test.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.13.0",
+    "eslint-config-prettier": "10.1.8",
+    "espree": "11.2.0",
+    "globals": "17.13.0",
+    "prettier": "3.9.10"
+  }
+}
