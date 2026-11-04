@@ -1,0 +1,6 @@
+interface:
+  display_name: "心语开发与回归防护"
+  short_description: "根据心语历史故障核查跨模块影响、执行回归并验证双版本发布产物"
+  default_prompt: "使用 $heartecho-development 处理心语本次开发任务，先复现并检查相邻链路，再修复、回归和验证交付产物。"
+policy:
+  allow_implicit_invocation: true
