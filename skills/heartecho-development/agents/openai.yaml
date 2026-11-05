@@ -1,0 +1,6 @@
+interface:
+  display_name: "心语开发与回归防护"
+  short_description: "核查心语跨模块回归、角色出戏风险与数字生命宗旨，并验证双版本发布产物"
+  default_prompt: "使用 $heartecho-development 处理心语本次开发任务，检查相邻链路并回归；每次改动后确认是否出戏、是否符合数字生命与真实陪伴宗旨，再验证交付产物。"
+policy:
+  allow_implicit_invocation: true
