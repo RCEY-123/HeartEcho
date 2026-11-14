@@ -184,6 +184,10 @@ test("安装负载解压：校验内容并拒绝越界、重名和异常条目",
     assert.equal(fs.existsSync(path.join(install, "INSTALL-EDITION.txt")), false);
     assert.equal(fs.readFileSync(path.join(data, "database", "main.db"), "utf8"), "user-db");
     const legacy = path.join(tmp, "旧数据"), imported = path.join(tmp, "导入数据");
+    const emptyLegacy = path.join(tmp, "只有初始化设置的空心语");
+    fs.mkdirSync(path.join(emptyLegacy, "characters"), { recursive: true });
+    fs.writeFileSync(path.join(emptyLegacy, "config.json"), "{}");
+    assert.equal(spawnSync(exe, ["import", emptyLegacy, path.join(tmp, "不应报告导入成功")]).status, 1, "没有旧角色的初始化目录不应被报告为导入成功");
     fs.mkdirSync(path.join(legacy, "characters"), { recursive: true });
     fs.writeFileSync(path.join(legacy, "config.json"), "synthetic-secret");
     fs.writeFileSync(path.join(legacy, "characters", "role.json"), "character");
@@ -201,6 +205,27 @@ test("安装负载解压：校验内容并拒绝越界、重名和异常条目",
     assert.equal(fs.readFileSync(path.join(legacy, "config.json"), "utf8"), "synthetic-secret");
     assert.equal(spawnSync(exe, ["import", legacy, imported]).status, 1, "不能覆盖已有目标数据");
     assert.equal(spawnSync(exe, ["import", legacy, path.join(legacy, "nested")]).status, 1);
+    assert.equal(spawnSync(exe, ["import", legacy, legacy]).status, 0, "同目录原地升级应保留数据");
+    const oldProgram = path.join(tmp, "旧程序目录");
+    fs.mkdirSync(oldProgram);
+    fs.writeFileSync(path.join(oldProgram, "心语设置.json"), JSON.stringify({ dataDir: legacy }));
+    fs.writeFileSync(path.join(oldProgram, "旧心语.exe"), "not-executed");
+    assert.equal(spawnSync(exe, ["import", path.join(oldProgram, "旧心语.exe"), path.join(tmp, "选择旧exe识别数据")]).status, 0);
+    const fromSettings = path.join(tmp, "自动识别设置");
+    assert.equal(spawnSync(exe, ["import", oldProgram, fromSettings]).status, 0);
+    assert.equal(fs.readFileSync(path.join(fromSettings, "characters", "role.json"), "utf8"), "character");
+    const portable = path.join(tmp, "旧便携版");
+    fs.mkdirSync(path.join(portable, "data", "characters"), { recursive: true });
+    fs.writeFileSync(path.join(portable, "data", "characters", "role.json"), "portable");
+    assert.equal(spawnSync(exe, ["import", portable, path.join(tmp, "识别data")]).status, 0);
+    if (process.env.LOCALAPPDATA) {
+      const localTarget = path.join(process.env.LOCALAPPDATA, "heartecho-migration-test-" + Date.now());
+      try {
+        const efsImport = spawnSync(exe, ["import", legacy, localTarget], { encoding: "utf8" });
+        assert.equal(efsImport.status, 0, "加密或重定向用户目录应支持复制提交");
+        assert.equal(fs.readFileSync(path.join(localTarget, "characters", "role.json"), "utf8"), "character");
+      } finally { fs.rmSync(localTarget, { recursive: true, force: true }); }
+    }
     const alias = path.join(tmp, "旧数据别名");
     fs.symlinkSync(legacy, alias, "junction");
     assert.equal(spawnSync(exe, ["import", legacy, path.join(alias, "nested")]).status, 1);

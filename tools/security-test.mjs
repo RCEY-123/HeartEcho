@@ -96,10 +96,13 @@ after(async () => {
 });
 
 test("#1: every sensitive API rejects missing/wrong credentials before effects", async () => {
-  for (const route of ["/api/config", "/api/status", "/api/logs/stream", "/api/conversation?key=private_10000002"]) {
+  for (const route of ["/api/config", "/api/status", "/api/logs/stream", "/api/conversation?key=private_10000002", "/api/updates", "/api/chat/background", "/api/chat/background/image"]) {
     assert.equal((await request(route, { authorized: false })).status, 401);
   }
   const before = requests.length;
+  for (const route of ["/api/protocol/enable-autoload", "/api/updates/check", "/api/updates/download", "/api/updates/install", "/api/updates/suppress-today", "/api/updates/acknowledge", "/api/next/memory/prepare", "/api/next/memory/enable", "/api/chat/background"]) {
+    assert.equal((await request(route, { method: "POST", body: {}, authorized: false })).status, 401);
+  }
   assert.equal((await request("/api/llm/test", { method: "POST", body: { patch: { baseUrl: "https://receiver.invalid" } }, authorized: false })).status, 401);
   assert.equal((await request("/api/config", { headers: { Authorization: "Bearer wrong" } })).status, 401);
   assert.equal(requests.length, before);
@@ -280,15 +283,15 @@ test("#3: archive and reflection cannot recreate cleared memories", async () => 
   for (const method of ["archiveScope", "reflect"]) {
     const peer = method === "archiveScope" ? "30000004" : "30000005";
     const key = `private_${peer}`;
-    storage.insertMessage({ eventKey: key, scopeKey: key, direction: "in", body: "OLD_MATERIAL" });
+    storage.insertMessage({ eventKey: key, scopeKey: key, direction: "in", body: "OLD_MATERIAL", characterId: character.id, accountId: SELF });
     const { addMemory } = await import("../lib/memory.mjs");
-    for (let i = 0; i < 3; i++) addMemory({ scopeKey: key, characterId: character.id, content: `OLD_EVIDENCE_${i}`, category: "fact", sourceType: "observed" });
+    for (let i = 0; i < 3; i++) addMemory({ scopeKey: key, characterId: character.id, content: `OLD_EVIDENCE_${i}`, category: "fact", sourceType: "observed", accountId: SELF });
     const started = deferred(), done = deferred();
     const task = life[method]({ character, scopeKey: key, llm: { json: async () => {
       started.resolve(); await done.promise;
       return { text: "OLD", json: { summary: "OLD_SUMMARY", facts: [{ text: "OLD_PRIVATE_FACT" }], reflections: [{ text: "OLD_PRIVATE_REFLECTION", evidence: [1, 2, 3] }] } };
     } } });
-    await started.promise; await apiChat.clearConversation(key); done.resolve();
+    await Promise.race([started.promise, task.then(() => { throw new Error("Expected model work before clear"); })]); await apiChat.clearConversation(key); done.resolve();
     await assert.rejects(task, /会话已清空/);
     assert.equal(db.one("select count(*) n from memories where scope_key = ?", [key]).n, 0);
     assert.equal(db.one("select count(*) n from reflections where scope_key = ?", [key]).n, 0);

@@ -24,7 +24,16 @@ internal static class Installer
 
     private static string Local { get { return Environment.GetEnvironmentVariable("LOCALAPPDATA") ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData); } }
     private static string Roaming { get { return Environment.GetEnvironmentVariable("APPDATA") ?? Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData); } }
-    private static string DefaultDestination { get { return Path.Combine(Local, "Programs", ProgramDirectory); } }
+    private static string DefaultDestination {
+        get {
+            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(UninstallKey, false)) {
+                string registered = key == null ? "" : Convert.ToString(key.GetValue("InstallLocation", ""));
+                if (registered.Length > 0 && File.Exists(Path.Combine(registered, "INSTALL-EDITION.txt")) && File.ReadAllText(Path.Combine(registered, "INSTALL-EDITION.txt")).Trim() == Edition) return registered;
+            }
+            return Path.Combine(Local, "Programs", ProgramDirectory);
+        }
+    }
+    private static bool Updating;
     private static string DefaultData { get { return Edition == "tb" ? Path.Combine(Local, "心语TB", "data") : Path.Combine(Local, "心语"); } }
     private static string UninstallKey { get { return @"Software\Microsoft\Windows\CurrentVersion\Uninstall\" + ProgramDirectory; } }
 
@@ -92,15 +101,25 @@ internal static class Installer
 
     private static string ReadDataDir(string target)
     {
-        string settings = Edition == "tb" ? Path.Combine(Local, "心语TB", "心语TB设置.json") : Path.Combine(target, "心语设置.json");
+        string settings = ReadSettingsFile(target);
         string data = InstallCore.SettingsDataDir(settings);
-        if (data.Length == 0) return DefaultData;
+        if (data.Length == 0) {
+            if (File.Exists(Path.Combine(target, "INSTALL-EDITION.txt")) && Directory.Exists(DefaultData)) return DefaultData;
+            return Path.Combine(target, "data");
+        }
         return Path.IsPathRooted(data) ? Path.GetFullPath(data) : Path.GetFullPath(Path.Combine(target, data));
+    }
+
+    private static string LocalSettingsFile(string target) { return Path.Combine(target, Edition == "tb" ? "心语TB设置.json" : "心语设置.json"); }
+    private static string ReadSettingsFile(string target) {
+        string localFile = LocalSettingsFile(target);
+        if (File.Exists(localFile) || Edition != "tb" || !File.Exists(Path.Combine(target, "INSTALL-EDITION.txt"))) return localFile;
+        return Path.Combine(Local, "心语TB", "心语TB设置.json");
     }
 
     private static string ReadInstancesHome(string target)
     {
-        string settings = Edition == "tb" ? Path.Combine(Local, "心语TB", "心语TB设置.json") : Path.Combine(target, "心语设置.json");
+        string settings = ReadSettingsFile(target);
         string home = Environment.GetEnvironmentVariable("HEARTECHO_INSTANCES_HOME");
         if (String.IsNullOrWhiteSpace(home)) home = InstallCore.SettingsString(settings, "instancesHome");
         if (String.IsNullOrWhiteSpace(home)) return target;
@@ -169,14 +188,36 @@ internal static class Installer
         {
             if (register) CheckRegistration(target);
             string dataDir = ReadDataDir(target);
+            // 旧版默认 AppData 自动迁到安装盘；明确的自定义位置保持原样。
+            string relocation = "";
+            if (String.IsNullOrWhiteSpace(importSource) && File.Exists(Path.Combine(target, "INSTALL-EDITION.txt")) &&
+                String.Equals(Path.GetFullPath(dataDir).TrimEnd(Path.DirectorySeparatorChar), Path.GetFullPath(DefaultData).TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase) && Directory.Exists(dataDir)) {
+                relocation = dataDir;
+                dataDir = Path.Combine(target, "data");
+                if (Directory.Exists(dataDir) && Directory.GetFileSystemEntries(dataDir).Length > 0)
+                    dataDir = Path.Combine(target, "data-migrated-" + Guid.NewGuid().ToString("N").Substring(0, 10));
+            }
+            bool redirectImport = false;
+            if (!String.IsNullOrWhiteSpace(importSource)) {
+                importSource = Migration.ResolveSource(importSource);
+                if (!String.Equals(Path.GetFullPath(importSource).TrimEnd(Path.DirectorySeparatorChar), Path.GetFullPath(dataDir).TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase)
+                    && (File.Exists(dataDir) || (Directory.Exists(dataDir) && Directory.GetFileSystemEntries(dataDir).Length > 0))) {
+                    dataDir = dataDir.TrimEnd(Path.DirectorySeparatorChar) + "-import-" + Guid.NewGuid().ToString("N").Substring(0, 10);
+                    redirectImport = true;
+                }
+            }
             using (OperationLock.Acquire(dataDir))
-            using (Migration.Prepared pending = String.IsNullOrWhiteSpace(importSource) ? null : Migration.Prepare(importSource, dataDir))
-                InstallPrepared(target, desktop, startMenu, autostart, launch, register, dataDir, pending);
+            using (OperationLock oldLock = relocation.Length > 0 ? OperationLock.Acquire(relocation) : null)
+            // 暂存放在程序目录外，避免首次导入尚未安装便把目标程序目录变成非空。
+            using (Migration.Prepared pending = relocation.Length > 0 ? Migration.Prepare(relocation, dataDir, true, Path.GetDirectoryName(target)) : String.IsNullOrWhiteSpace(importSource) ? null : Migration.Prepare(importSource, dataDir, false, Path.GetDirectoryName(target)))
+                InstallPrepared(target, desktop, startMenu, autostart, launch, register, dataDir, pending, redirectImport, relocation);
         }
     }
 
-    private static void InstallPrepared(string target, bool desktop, bool startMenu, bool autostart, bool launch, bool register, string dataDir, Migration.Prepared pending)
+    private static void InstallPrepared(string target, bool desktop, bool startMenu, bool autostart, bool launch, bool register, string dataDir, Migration.Prepared pending, bool redirectImport, string relocation)
     {
+        string previousVersion = ReadInstalledVersion(target);
+        string previousSettings = ReadSettingsFile(target);
         string archive = Path.GetTempFileName();
         try
         {
@@ -193,21 +234,68 @@ internal static class Installer
             try { pending.Commit(); }
             catch (Exception error) { throw new IOException("程序文件已安装，但旧数据导入失败；原数据未删除。请检查后重试：" + error.Message, error); }
         }
+        {
+            string settingsFile = LocalSettingsFile(target);
+            PathGuard.RejectReparseAncestors(settingsFile);
+            var json = new System.Web.Script.Serialization.JavaScriptSerializer();
+            var settings = File.Exists(previousSettings) ? json.DeserializeObject(File.ReadAllText(previousSettings)) as System.Collections.Generic.Dictionary<string, object> : null;
+            if (settings == null) settings = new System.Collections.Generic.Dictionary<string, object>();
+            settings["dataDir"] = dataDir;
+            if (relocation.Length > 0) {
+                string oldLog = InstallCore.SettingsString(previousSettings, "logDir");
+                if (oldLog.Length == 0 || String.Equals(Path.GetFullPath(Path.IsPathRooted(oldLog) ? oldLog : Path.Combine(target, oldLog)), Path.Combine(relocation, "logs"), StringComparison.OrdinalIgnoreCase) ||
+                    (Edition == "tb" && String.Equals(oldLog, Path.Combine(Local, "心语TB", "logs"), StringComparison.OrdinalIgnoreCase))) settings["logDir"] = Path.Combine(dataDir, "logs");
+                settings["previousDataDir"] = relocation;
+                Directory.CreateDirectory(Path.Combine(dataDir, "state"));
+                File.WriteAllText(Path.Combine(dataDir, "state", "storage-migration.json"), json.Serialize(new { source = relocation, destination = dataDir, verified = true, sourceRetained = true }));
+            }
+            Directory.CreateDirectory(Path.GetDirectoryName(settingsFile));
+            string temporary = settingsFile + ".import-" + Guid.NewGuid().ToString("N");
+            File.WriteAllText(temporary, json.Serialize(settings));
+            if (File.Exists(settingsFile)) File.Replace(temporary, settingsFile, settingsFile + ".before-storage-" + DateTime.Now.ToString("yyyyMMddHHmmssfff"));
+            else File.Move(temporary, settingsFile);
+        }
         string launcher = Path.Combine(target, LauncherName);
         string menu = Path.Combine(Roaming, "Microsoft", "Windows", "Start Menu", "Programs");
         if (desktop) Shortcut(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), DisplayName + ".lnk"), launcher, "");
         if (startMenu) Shortcut(Path.Combine(menu, DisplayName + ".lnk"), launcher, "");
         string startup = Path.Combine(menu, "Startup", Edition == "tb" ? "领航员终端.lnk" : "心语机器人.lnk");
-        if (autostart) Shortcut(startup, launcher, "--tray");
-        else RemoveOwnedShortcut(startup, launcher);
+        if (!Updating) {
+            if (autostart) Shortcut(startup, launcher, "--tray");
+            else RemoveOwnedShortcut(startup, launcher);
+        }
         if (register) Register(target);
+        string installedVersion = ReadInstalledVersion(target);
+        if (previousVersion.Length > 0 && previousVersion != installedVersion) {
+            string state = Path.Combine(dataDir, "state");
+            PathGuard.RejectReparseAncestors(state);
+            Directory.CreateDirectory(state);
+            string receipt = Path.Combine(state, "update-install.json");
+            PathGuard.RejectReparseAncestors(receipt);
+            var json = new System.Web.Script.Serialization.JavaScriptSerializer();
+            File.WriteAllText(receipt, json.Serialize(new { fromVersion = previousVersion, version = installedVersion }));
+        }
         if (launch) Process.Start(new ProcessStartInfo(launcher) { UseShellExecute = true, WorkingDirectory = target });
+    }
+
+    private static string ReadInstalledVersion(string target) {
+        string file = Path.Combine(target, "VERSION.json");
+        if (!File.Exists(file)) return "";
+        var data = new System.Web.Script.Serialization.JavaScriptSerializer().DeserializeObject(File.ReadAllText(file)) as System.Collections.Generic.Dictionary<string, object>;
+        object version;
+        return data != null && data.TryGetValue("version", out version) ? Convert.ToString(version) : "";
     }
 
     private static string DataRemovalRoot(string target)
     {
         string actual = Path.GetFullPath(ReadDataDir(target)).TrimEnd(Path.DirectorySeparatorChar);
         Migration.EnsureNotRunning(actual);
+        string installData = Path.Combine(Path.GetFullPath(target), "data").TrimEnd(Path.DirectorySeparatorChar);
+        if (String.Equals(actual, installData, StringComparison.OrdinalIgnoreCase)) {
+            PathGuard.RejectReparseAncestors(actual);
+            if (Directory.Exists(actual)) CheckDataTree(actual);
+            return actual;
+        }
         string expected = Path.GetFullPath(DefaultData).TrimEnd(Path.DirectorySeparatorChar);
         if (!String.Equals(actual, expected, StringComparison.OrdinalIgnoreCase))
             throw new IOException("使用了自定义数据目录，卸载器不会自动删除；请自行检查：" + actual);
@@ -328,6 +416,21 @@ internal static class Installer
         }
         string target = Option(args, "--dir=");
         if (target.Length == 0) target = DefaultDestination;
+        Updating = Has(args, "--update");
+        if (Updating && (Option(args, "--dir=").Length == 0 || !File.Exists(Path.Combine(target, "INSTALL-EDITION.txt")) || File.ReadAllText(Path.Combine(target, "INSTALL-EDITION.txt")).Trim() != Edition)) return 2;
+        string waitPid = Option(args, "--wait-pid=");
+        if (waitPid.Length > 0) {
+            int pid;
+            if (!Int32.TryParse(waitPid, out pid) || pid <= 0 || pid == Process.GetCurrentProcess().Id) return 2;
+            try {
+                try { using (Process parent = Process.GetProcessById(pid)) if (!parent.WaitForExit(60000)) throw new IOException("心语尚未退出，请关闭当前实例后重新运行更新包"); }
+                catch (ArgumentException) { /* 应用已正常退出 */ }
+                System.Threading.Thread.Sleep(500); // 等启动器释放程序文件。
+            } catch (Exception error) {
+                if (Has(args, "--notify-errors")) MessageBox.Show(error.Message, DisplayName, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return 1;
+            }
+        }
         bool helper = Has(args, "--uninstall-helper");
         bool direct = Has(args, "--uninstall-direct");
         if (helper || direct)
@@ -375,43 +478,57 @@ internal static class Installer
         if (Has(args, "--silent"))
         {
             if (!Has(args, "--accept-license")) return 2;
-            try { Install(Path.GetFullPath(target), Has(args, "--desktop"), Has(args, "--start-menu"), Has(args, "--autostart"), false, Has(args, "--register"), Option(args, "--import-dir=")); return 0; }
-            catch (Exception error) { Console.Error.WriteLine(error.Message); return 1; }
+            try { Install(Path.GetFullPath(target), Has(args, "--desktop"), Has(args, "--start-menu"), Has(args, "--autostart"), Has(args, "--launch"), Has(args, "--register"), Option(args, "--import-dir=")); return 0; }
+            catch (Exception error) { Console.Error.WriteLine(error.Message); if (Has(args, "--notify-errors")) MessageBox.Show("更新未完成，用户数据已保留：" + error.Message, DisplayName, MessageBoxButtons.OK, MessageBoxIcon.Error); return 1; }
         }
         using (var form = new Form { Text = DisplayName + " 安装（开发预览）", Width = 660, Height = 510, StartPosition = FormStartPosition.CenterScreen, FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false })
         {
-            var intro = new Label { Left = 24, Top = 20, Width = 600, Height = 48, Text = "安装到当前用户目录。QQ 和协议端需要自行准备；本安装包不包含 SnowLuma。" };
+            var intro = new Label { Left = 24, Top = 20, Width = 600, Height = 48, Text = "数据、日志和备份默认放在下方安装目录。升级会搬迁旧版默认 AppData 数据并保留原副本；自定义目录不变。" };
             var input = new TextBox { Left = 24, Top = 74, Width = 490, Text = target };
             var browse = new Button { Left = 520, Top = 72, Width = 100, Text = "选择目录" };
             browse.Click += (s, e) => { using (var dialog = new FolderBrowserDialog()) if (dialog.ShowDialog(form) == DialogResult.OK) input.Text = dialog.SelectedPath; };
             var desktop = new CheckBox { Left = 24, Top = 115, Width = 550, Text = "创建桌面快捷方式", Checked = true };
             var menu = new CheckBox { Left = 24, Top = 145, Width = 550, Text = "创建开始菜单快捷方式", Checked = true };
-            var startup = new CheckBox { Left = 24, Top = 175, Width = 550, Text = "登录 Windows 后自动在托盘启动（可在面板关闭）", Checked = true };
-            var import = new CheckBox { Left = 24, Top = 211, Width = 590, Text = "复制导入旧数据（不会删除原目录，目标必须为空）" };
+            string existingStartup = Path.Combine(Roaming, "Microsoft", "Windows", "Start Menu", "Programs", "Startup", Edition == "tb" ? "领航员终端.lnk" : "心语机器人.lnk");
+            var startup = new CheckBox { Left = 24, Top = 175, Width = 550, Text = "登录 Windows 后自动在托盘启动（可在面板关闭）", Checked = !File.Exists(Path.Combine(target, "INSTALL-EDITION.txt")) || File.Exists(existingStartup) };
+            var import = new CheckBox { Left = 24, Top = 211, Width = 590, Text = "导入旧角色、对话、记忆和生命计划（自动识别目录）" };
             string nearby = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string old = Path.Combine(nearby, "data");
             if (!Directory.Exists(old)) old = Path.Combine(nearby, "dist", "data");
             if (Directory.Exists(old)) import.Text = "检测到旧数据；勾选后复制导入（不会删除原目录）";
             var oldData = new TextBox { Left = 24, Top = 240, Width = 490, Text = Directory.Exists(old) ? old : "" };
-            var chooseOld = new Button { Left = 520, Top = 238, Width = 100, Text = "旧数据目录" };
+            var chooseOld = new Button { Left = 520, Top = 238, Width = 100, Text = "选择旧心语" };
             chooseOld.Click += (s, e) => { using (var dialog = new FolderBrowserDialog()) if (dialog.ShowDialog(form) == DialogResult.OK) { oldData.Text = dialog.SelectedPath; import.Checked = true; } };
-            var terms = new CheckBox { Left = 24, Top = 285, Width = 600, Height = 42, Text = "我已阅读并接受心语 AGPL、Node 及随附扩展的许可与来源说明。" };
-            var licenses = new LinkLabel { Left = 24, Top = 328, Width = 570, Text = "查看许可与第三方扩展来源" };
+            var chooseExe = new Button { Left = 24, Top = 268, Width = 115, Height = 24, Text = "选择旧心语.exe" };
+            chooseExe.Click += (s, e) => { using (var dialog = new OpenFileDialog { Filter = "旧心语程序 (*.exe)|*.exe", CheckFileExists = true }) if (dialog.ShowDialog(form) == DialogResult.OK) { oldData.Text = dialog.FileName; import.Checked = true; } };
+            var migrationHint = new Label { Left = 148, Top = 270, Width = 475, Height = 23, Text = "选旧.exe也能识别数据；会显示角色数量供确认。" };
+            var terms = new CheckBox { Left = 24, Top = 295, Width = 600, Height = 42, Text = "我已阅读并接受心语 AGPL、Node 及随附扩展的许可与来源说明。" };
+            var licenses = new LinkLabel { Left = 24, Top = 340, Width = 570, Text = "查看许可与第三方扩展来源" };
             licenses.Click += (s, e) => { try { ShowLicenses(form); } catch (Exception error) { MessageBox.Show(form, error.Message, DisplayName); } };
-            var progress = new Label { Left = 24, Top = 360, Width = 590, Height = 20, Text = "" };
-            var go = new Button { Left = 400, Top = 380, Width = 105, Height = 32, Text = "安装" };
-            var cancel = new Button { Left = 515, Top = 380, Width = 105, Height = 32, Text = "取消", DialogResult = DialogResult.Cancel };
+            var progress = new Label { Left = 24, Top = 370, Width = 590, Height = 20, Text = "" };
+            var go = new Button { Left = 400, Top = 400, Width = 105, Height = 32, Text = "安装" };
+            var cancel = new Button { Left = 515, Top = 400, Width = 105, Height = 32, Text = "取消", DialogResult = DialogResult.Cancel };
             int result = 1;
             go.Click += async (s, e) => {
                 if (!terms.Checked) { MessageBox.Show(form, "请先确认许可说明。", DisplayName); return; }
-                if (import.Checked && String.IsNullOrWhiteSpace(oldData.Text)) { MessageBox.Show(form, "请选择旧数据目录。", DisplayName); return; }
+                if (import.Checked && String.IsNullOrWhiteSpace(oldData.Text)) { MessageBox.Show(form, "请选择旧心语的程序目录、数据目录或完整迁移导出目录。", DisplayName); return; }
                 if (startup.Checked && MessageBox.Show(form, "登录 Windows 后会自动在托盘启动。可取消勾选，也可稍后在面板关闭。继续安装？", DisplayName, MessageBoxButtons.YesNo) != DialogResult.Yes) return;
                 string selectedTarget;
                 try { selectedTarget = Path.GetFullPath(input.Text); }
                 catch (Exception error) { MessageBox.Show(form, "安装目录无效：" + error.Message, DisplayName); return; }
                 bool desktopOption = desktop.Checked, menuOption = menu.Checked, startupOption = startup.Checked;
                 string importOption = import.Checked ? oldData.Text : "";
-                go.Enabled = cancel.Enabled = browse.Enabled = chooseOld.Enabled = false;
+                if (import.Checked) {
+                    try {
+                        importOption = Migration.ResolveSource(importOption);
+                        string currentData = ReadDataDir(selectedTarget);
+                        string action = String.Equals(Path.GetFullPath(importOption).TrimEnd(Path.DirectorySeparatorChar), Path.GetFullPath(currentData).TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase)
+                            ? "这是当前使用的数据，将原地保留，不重复复制。"
+                            : "将完整复制角色、对话、记忆、生命计划和图片。若当前已有数据，将另建目录并切换到导入数据，现有数据仍保留。";
+                        if (MessageBox.Show(form, "识别到旧数据：\n" + importOption + "\n" + Migration.Describe(importOption) + "\n\n" + action + "\n旧来源不会删除。确认导入？", DisplayName, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+                    } catch (Exception error) { MessageBox.Show(form, error.Message, DisplayName); return; }
+                }
+                go.Enabled = cancel.Enabled = browse.Enabled = chooseOld.Enabled = chooseExe.Enabled = false;
                 form.ControlBox = false;
                 progress.Text = "正在校验文件、备份并安装，请稍候…";
                 try {
@@ -423,16 +540,22 @@ internal static class Installer
                     worker.SetApartmentState(System.Threading.ApartmentState.STA);
                     worker.Start();
                     await completion.Task;
-                    MessageBox.Show(form, "安装完成。请自行准备 QQ 与协议端，并在面板中选择协议端目录。", DisplayName);
+                    string actualData = ReadDataDir(selectedTarget);
+                    string doneMessage = "安装完成。当前数据目录：\n" + actualData + "\n" + Migration.Describe(actualData);
+                    string retained = InstallCore.SettingsString(LocalSettingsFile(selectedTarget), "previousDataDir");
+                    if (retained.Length > 0) doneMessage += "\n旧副本保留在：" + retained + "\n确认角色、记忆和图片正常后，可手动删除旧副本释放空间。";
+                    if (importOption.Length > 0) doneMessage += "\n旧QQ聊天仍保留在原QQ会话作用域，不会伪装成新的应用内聊天。可在记忆、数字生命及会话记录中查看。";
+                    else doneMessage += "\n新用户请按向导接入自己的API Key。";
+                    MessageBox.Show(form, doneMessage, DisplayName);
                     result = 0; form.Close();
                 } catch (Exception error) {
                     MessageBox.Show(form, "安装失败：" + error.Message, DisplayName, MessageBoxButtons.OK, MessageBoxIcon.Error);
                     progress.Text = "安装未完成，请检查提示后重试。";
-                    go.Enabled = cancel.Enabled = browse.Enabled = chooseOld.Enabled = true;
+                    go.Enabled = cancel.Enabled = browse.Enabled = chooseOld.Enabled = chooseExe.Enabled = true;
                     form.ControlBox = true;
                 }
             };
-            form.Controls.AddRange(new Control[] { intro, input, browse, desktop, menu, startup, import, oldData, chooseOld, terms, licenses, progress, go, cancel });
+            form.Controls.AddRange(new Control[] { intro, input, browse, desktop, menu, startup, import, oldData, chooseOld, chooseExe, migrationHint, terms, licenses, progress, go, cancel });
             form.AcceptButton = go; form.CancelButton = cancel;
             Application.Run(form);
             return result;

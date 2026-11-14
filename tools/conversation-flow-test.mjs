@@ -38,6 +38,8 @@ const baseline = {
     firstDelayMs: 0,
     typingDelayMs: 0,
     splitBubbles: false,
+    maxReplyChars: 180,
+    maxBubbles: 3,
     antiStall: false,
     rememberFacts: false,
     quietHours: { enabled: false },
@@ -145,6 +147,42 @@ after(() => {
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
+test("QQ delivery and stored history retain the entire reply beyond bubble style limits", async () => {
+  config.saveConfig({ chat: { splitBubbles: true, maxReplyChars: 20, maxBubbles: 1 } });
+  const text = "刚才去收被子的时候，闻到上面晒过太阳的味道。".repeat(20) + "我（明天一定）会记得【带伞】。";
+  const { engine, sent } = makeEngine(() => ({ text, usage: {} }));
+  await engine.receive(event(10000091, "想听你说说晒被子和带伞的事"));
+  await until(() => sent.length === 1);
+  assert.equal(sent[0].text.replace(/\s/g, ""), text.replace(/\s/g, ""));
+  assert.equal(db.one("select body from messages where scope_key=? and direction='out'", ["private_10000091"]).body, sent[0].text);
+});
+
+for (const split of [false, true]) test(`model transport markers are removed before QQ delivery and storage with split=${split}`, async () => {
+  config.saveConfig({ chat: { splitBubbles: split, maxReplyChars: 20, maxBubbles: 3 } });
+  const expected = "握着的时候要轻一点哦，角根那里有些怕痒呢。头上的角热乎乎的，给你暖手正好。";
+  const raw = "[:: 10000001 ::]握着的时候要轻一点哦，角根那里有些怕痒呢。[:: 0.20 :]]头上的角热乎乎的，给你暖手正好。";
+  const peer = split ? 10000093 : 10000092;
+  const { engine, sent } = makeEngine(() => ({ text: raw, usage: {} }));
+  await engine.receive(event(peer, "可以握一下你的角吗"));
+  await until(() => db.one("select count(*) as n from messages where scope_key=? and direction='out'", [`private_${peer}`]).n === sent.length && sent.length > 0 && sent.map(x => x.text).join("") === expected);
+  assert.equal(sent.map(x => x.text).join(""), expected);
+  const rows = db.all("select body from messages where scope_key=? and direction='out' order by id", [`private_${peer}`]);
+  assert.equal(rows.map(x => x.body).join(""), expected);
+});
+
+for (const split of [false, true]) test(`thought transport markers are removed before QQ delivery and storage with split=${split}`, async () => {
+  config.saveConfig({ chat: { splitBubbles: split, maxReplyChars: 20, maxBubbles: 3 } });
+  const expected = "我已经把小毯子盖在腿上啦，暖呼呼的呢。你也记得保暖。";
+  const raw = "[::thought\n]::我已经把小毯子盖在腿上啦，暖呼呼的呢。[::thought\\n]::你也记得保暖。";
+  const peer = split ? 10000095 : 10000094;
+  const { engine, sent } = makeEngine(() => ({ text: raw, usage: {} }));
+  await engine.receive(event(peer, "盖好毯子了吗"));
+  await until(() => sent.length > 0 && !engine.busy.has(`private_${peer}`));
+  assert.equal(sent.map(x => x.text).join(""), expected);
+  const rows = db.all("select body from messages where scope_key=? and direction='out' order by id", [`private_${peer}`]);
+  assert.equal(rows.map(x => x.body).join(""), expected);
+});
+
 test("five consecutive inputs are persisted immediately and generate once after the last pause", async () => {
   const { engine, calls, sent } = makeEngine();
   for (let i = 1; i <= 5; i++) {
@@ -160,6 +198,7 @@ test("five consecutive inputs are persisted immediately and generate once after 
   );
   await until(() => sent.length === 1);
   assert.equal(calls.length, 1);
+  assert.equal(calls[0].userText, [1, 2, 3, 4, 5].map(i => `sentence ${i}`).join("\n"), "同一个人的连发呈现为一段完整输入，不伪装成多轮对话");
   for (let i = 1; i <= 5; i++) assert.ok(calls[0].userText.includes(`sentence ${i}`));
   assert.equal(calls[0].options.history.length, 0, "the current input must not also appear in history");
 });
@@ -455,3 +494,4 @@ test("member UI defaults collapsed and preserves drafts/open state across pages,
   assert.equal(((await ctx.view.pageGroups()).match(/data-save=/g) || []).length, 1);
   assert.equal(state.drafts.get("30000000").note, "UNSAVED & draft");
 });
+

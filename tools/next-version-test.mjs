@@ -449,6 +449,10 @@ test("editing rotates a remote bank, deleting revokes immediately, and erasure i
 });
 
 test("daily summaries preserve exact provenance and are idempotent", async () => {
+  // This test owns its input set; today's messages now participate as well.
+  db.run("delete from messages");
+  db.run("delete from message_origins");
+  db.run("delete from sessions");
   consent();
   const e = engine();
   const yesterday = new Date();
@@ -712,7 +716,7 @@ test("schema v2 upgrades preserve legacy conversations without guessing new prov
   );
   db.closeDb();
   db.getDb();
-  assert.equal(db.one("pragma user_version").user_version, 3);
+  assert.equal(db.one("pragma user_version").user_version, db.SCHEMA_VERSION);
   assert.equal(storage.messageCount("private_200"), before);
   assert.equal(db.one("select count(*) as n from message_origins").n, 0);
 });

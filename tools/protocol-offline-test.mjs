@@ -21,9 +21,10 @@ test("安装版用随包 Node 启动用户选择的模拟协议端", { timeout: 
   fs.mkdirSync(path.join(app, "runtime"), { recursive: true });
   fs.mkdirSync(path.join(protocolDir, "config"), { recursive: true });
   fs.copyFileSync(process.execPath, path.join(app, "runtime", "node.exe"));
-  fs.writeFileSync(path.join(protocolDir, "config", "runtime.json"), JSON.stringify({ webuiPort }));
+  fs.writeFileSync(path.join(protocolDir, "config", "runtime.json"), JSON.stringify({ webuiPort, hookAutoLoad: true }));
   fs.writeFileSync(path.join(protocolDir, "package.json"), JSON.stringify({ name: "@snowluma/runtime", version: "1.14.22" }));
-  fs.writeFileSync(path.join(protocolDir, "index.mjs"), `import net from 'node:net';net.createServer().listen(${port},'127.0.0.1');`);
+  fs.writeFileSync(path.join(protocolDir, "index.mjs"), `import fs from 'node:fs';import net from 'node:net';fs.writeFileSync('autoload-env.json',JSON.stringify({autoLoad:process.env.SNOWLUMA_HOOK_AUTOLOAD}));if(process.env.SNOWLUMA_HOOK_AUTOLOAD==='1')net.createServer().listen(${port},'127.0.0.1');`);
+  process.env.SNOWLUMA_HOOK_AUTOLOAD = "0";
   const settings = path.join(tmp, "settings.json");
   fs.writeFileSync(settings, JSON.stringify({ snowlumaDir: protocolDir, autoStartProtocol: false }));
   for (const key of Object.keys(process.env)) if (key.startsWith("HEARTECHO_")) delete process.env[key];
@@ -61,6 +62,7 @@ test("安装版用随包 Node 启动用户选择的模拟协议端", { timeout: 
     const result = await startProtocol({ waitMs: 8000 });
     pid = result.pid || 0;
     assert.ok(result.ok && pid, result.message);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(protocolDir, "autoload-env.json"), "utf8")).autoLoad, "1", "已保存的自动接入设置优先于旧启动器环境变量");
     assert.equal((await diagnoseProtocol()).running, true);
     const oldPid = pid;
     const restarted = await restartProtocol({ waitMs: 8000 });

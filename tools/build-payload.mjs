@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { installerIcon } from "./installer-icon.mjs";
+import { auditPayload } from "./privacy-audit.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const args = process.argv.slice(2);
@@ -83,6 +84,8 @@ fs.writeFileSync(path.join(app, "EXTENSION-AUTHORS.txt"), [
 ].join("\n"));
 fs.mkdirSync(path.join(app, "docs"));
 fs.copyFileSync(path.join(root, "docs", "NEXT-VERSION.md"), path.join(app, "docs", "NEXT-VERSION.md"));
+fs.copyFileSync(path.join(root, "docs", "成人向模式与模型推荐.md"), path.join(app, "docs", "成人向模式与模型推荐.md"));
+fs.copyFileSync(path.join(root, "docs", "角色卡管理.md"), path.join(app, "docs", "角色卡管理.md"));
 fs.mkdirSync(path.join(app, "tools"));
 for (const file of ["selftest.mjs", "png.mjs"]) fs.copyFileSync(path.join(root, "tools", file), path.join(app, "tools", file));
 fs.mkdirSync(path.join(output, "runtime"));
@@ -116,5 +119,7 @@ function manifest(dir, prefix = "") {
   }
 }
 manifest(output);
+const privacy = auditPayload(output);
+console.log("安装负载隐私审查：" + JSON.stringify(privacy));
 fs.writeFileSync(path.join(output, "SHA256SUMS.txt"), `${lines.join("\n")}\n`);
 console.log(`已生成 ${edition} 安装负载：${output}；未包含 QQ 协议端、账号数据或密钥。`);

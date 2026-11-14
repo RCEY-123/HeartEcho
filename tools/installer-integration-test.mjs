@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import net from "node:net";
 import { spawn, spawnSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
 import { createHash } from "node:crypto";
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -41,7 +42,15 @@ for (const setup of String(process.env.HEARTECHO_TEST_INSTALLERS || "").split(pa
       assert.ok(fs.existsSync(path.join(target, "卸载.exe")));
       assert.equal(fs.existsSync(path.join(target, "protocol")), false);
       const launcherPath = path.join(target, edition === "tb" ? "领航员终端.exe" : "心语.exe");
-      const data = edition === "tb" ? path.join(local, "心语TB", "data") : path.join(local, "心语");
+      const data = path.join(target, "data");
+      const home = path.join(tmp, "synthetic-home");
+      fs.mkdirSync(path.join(home, ".dsh"), { recursive: true });
+      fs.writeFileSync(path.join(home, ".dsh", ".env"), "DEEPSEEK_API_KEY=SYNTHETIC_PRIVATE_EXTERNAL");
+      const configUrl = pathToFileURL(path.join(target, "app", "lib", "config.mjs")).href;
+      const isolated = spawnSync(path.join(target, "runtime", "node.exe"), ["--input-type=module", "-e", "import {loadConfig} from " + JSON.stringify(configUrl) + "; const c=loadConfig(); process.exit(Object.values(c.llm.profiles).every(p=>!p.apiKey) && !c.onboarding.done ? 0 : 9);"], {
+        env: { ...env, HEARTECHO_DATA_DIR: path.join(tmp, "fresh-credential-data"), HEARTECHO_SETTINGS: path.join(tmp, "fresh-settings.json"), USERPROFILE: home, HOME: home, HEARTECHO_API_KEY: "SYNTHETIC_EXTERNAL_ONLY", DEEPSEEK_API_KEY: "SYNTHETIC_EXTERNAL_ONLY", HEARTECHO_TRIAL_KEY: "SYNTHETIC_EXTERNAL_ONLY" }, timeout: 10000,
+      });
+      assert.equal(isolated.status, 0, "实际安装包首次配置必须无 API Key 且需要首次向导");
       port = await freePort();
       fs.mkdirSync(data, { recursive: true });
       fs.writeFileSync(path.join(data, "config.json"), JSON.stringify({ bot: { selfId: 0, panelPort: port }, weather: { enabled: false },
@@ -67,12 +76,22 @@ for (const setup of String(process.env.HEARTECHO_TEST_INSTALLERS || "").split(pa
       assert.equal(ext.extensions.length, 16);
       const status = await fetch(`http://127.0.0.1:${port}/api/status`, { headers }).then((r) => r.json());
       assert.equal(status.version, version);
+      const post = (route, body) => fetch(`http://127.0.0.1:${port}${route}`, {
+        method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(body),
+      }).then((response) => response.json());
+      const role = await post("/api/characters/new", { name: "安装隔离测试", persona: "测试用角色", activate: true });
+      assert.equal(role.ok, true);
+      const native = await fetch(`http://127.0.0.1:${port}/api/chat/local`, { headers }).then((r) => r.json());
+      assert.equal(native.ok, true);
+      assert.equal(native.character.id, role.character.id);
+      const localReply = await post("/api/chat/local", { characterId: native.character.id, generation: native.generation, requestId: "installer-native-001", text: "记住：这是安装包中的原生对话" });
+      assert.equal(localReply.state, "done", JSON.stringify(localReply));
       assert.equal(spawnSync(setup, [...setupArgs, "--accept-license"], { env, timeout: 30000 }).status, 1, "运行中不应覆盖升级");
       const uninstallArgs = ["--silent", "--uninstall-direct", "--accept-uninstall", "--no-register", `--dir=${target}`];
       assert.equal(spawnSync(setup, uninstallArgs, { env, timeout: 30000 }).status, 1, "运行中不应卸载");
       await fetch(`http://127.0.0.1:${port}/api/system/quit`, { method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: "{}" });
       if (launcher.exitCode === null) await new Promise((resolve) => launcher.once("exit", resolve));
-      const mainSettings = edition === "tb" ? path.join(local, "心语TB", "心语TB设置.json") : path.join(target, "心语设置.json");
+      const mainSettings = path.join(target, edition === "tb" ? "心语TB设置.json" : "心语设置.json");
       const originalSettings = fs.existsSync(mainSettings) ? fs.readFileSync(mainSettings, "utf8") : null;
       const externalHome = path.join(tmp, "外部实例家目录"), externalInstance = path.join(tmp, "外部登记实例");
       fs.mkdirSync(path.join(externalInstance, "data", "database"), { recursive: true });
@@ -105,10 +124,13 @@ for (const setup of String(process.env.HEARTECHO_TEST_INSTALLERS || "").split(pa
       const deletionTarget = path.join(tmp, "删除数据测试安装");
       const deletionSetup = ["--silent", "--accept-license", `--dir=${deletionTarget}`];
       assert.equal(spawnSync(setup, deletionSetup, { env, timeout: 30000 }).status, 0);
+      const deletionData = path.join(deletionTarget, "data");
+      fs.mkdirSync(path.join(deletionData, "database"), { recursive: true });
+      fs.writeFileSync(path.join(deletionData, "database", "main.db"), "synthetic-uninstall-only");
       const deleteArgs = ["--silent", "--uninstall-direct", "--accept-uninstall", "--no-register", "--delete-data", `--dir=${deletionTarget}`];
       assert.equal(spawnSync(setup, deleteArgs, { env, timeout: 30000 }).status, 2, "删除数据必须明确确认");
       assert.ok(fs.existsSync(path.join(data, "database", "main.db")));
-      const dataLock = path.join(tmp, `heartecho-${createHash("sha1").update(path.resolve(data).toLowerCase()).digest("hex").slice(0, 12)}.lock`);
+      const dataLock = path.join(tmp, `heartecho-${createHash("sha1").update(path.resolve(deletionData).toLowerCase()).digest("hex").slice(0, 12)}.lock`);
       fs.writeFileSync(dataLock, JSON.stringify({ pid: process.pid }), { flag: "wx" });
       try {
         assert.equal(spawnSync(setup, [...deleteArgs, "--confirm-delete-data"], { env, timeout: 30000 }).status, 1, "数据正在使用时不能删除");
@@ -117,7 +139,7 @@ for (const setup of String(process.env.HEARTECHO_TEST_INSTALLERS || "").split(pa
       } finally { fs.rmSync(dataLock); }
       const custom = path.join(tmp, "自定义数据");
       fs.mkdirSync(custom); fs.writeFileSync(path.join(custom, "keep"), "private");
-      const settingsFile = edition === "tb" ? path.join(local, "心语TB", "心语TB设置.json") : path.join(deletionTarget, "心语设置.json");
+      const settingsFile = path.join(deletionTarget, edition === "tb" ? "心语TB设置.json" : "心语设置.json");
       for (const invalid of ["null", "[]", '{"dataDir":42}', '{"dataDir":{}}', '{broken']) {
         fs.writeFileSync(settingsFile, invalid);
         assert.equal(spawnSync(setup, deletionSetup, { env, timeout: 30000 }).status, 1, "无效设置时不能升级");
@@ -132,7 +154,7 @@ for (const setup of String(process.env.HEARTECHO_TEST_INSTALLERS || "").split(pa
       fs.writeFileSync(settingsFile, "{}");
       const outside = path.join(tmp, "外部文件");
       fs.mkdirSync(outside); fs.writeFileSync(path.join(outside, "keep"), "outside");
-      const link = path.join(data, "external-junction");
+      const link = path.join(deletionData, "external-junction");
       fs.symlinkSync(outside, link, "junction");
       assert.equal(spawnSync(setup, [...deleteArgs, "--confirm-delete-data"], { env, timeout: 30000 }).status, 1);
       assert.equal(fs.readFileSync(path.join(outside, "keep"), "utf8"), "outside");
@@ -141,7 +163,8 @@ for (const setup of String(process.env.HEARTECHO_TEST_INSTALLERS || "").split(pa
       fs.copyFileSync(setup, helper);
       const helperArgs = ["--silent", "--uninstall-helper", "--no-register", "--delete-data", "--confirm-delete-data", `--dir=${deletionTarget}`];
       assert.equal(spawnSync(helper, helperArgs, { env, timeout: 30000 }).status, 0);
-      assert.equal(fs.existsSync(data), false);
+      assert.equal(fs.existsSync(deletionData), false);
+      assert.ok(fs.existsSync(data), "卸载一份安装不能删除另一份的独立数据");
       assert.equal(fs.readFileSync(path.join(outside, "keep"), "utf8"), "outside");
       for (let i = 0; i < 50 && fs.existsSync(helper); i++) await wait(100);
       assert.equal(fs.existsSync(helper), false, "临时卸载助手未清理");
@@ -152,12 +175,24 @@ for (const setup of String(process.env.HEARTECHO_TEST_INSTALLERS || "").split(pa
       const importArgs = ["--silent", "--accept-license", `--dir=${importedTarget}`, `--import-dir=${oldData}`];
       const imported = spawnSync(setup, importArgs, { env, timeout: 30000 });
       assert.equal(imported.status, 0, String(imported.error || imported.stderr || "导入失败"));
-      assert.equal(fs.readFileSync(path.join(data, "characters", "role.json"), "utf8"), "old-character");
+      assert.equal(fs.readFileSync(path.join(importedTarget, "data", "characters", "role.json"), "utf8"), "old-character");
       assert.equal(fs.readFileSync(path.join(oldData, "characters", "role.json"), "utf8"), "old-character");
-      const secondTarget = path.join(tmp, "不可覆盖测试");
-      assert.equal(spawnSync(setup, ["--silent", "--accept-license", `--dir=${secondTarget}`, `--import-dir=${oldData}`], { env, timeout: 30000 }).status, 1);
-      assert.equal(fs.readFileSync(path.join(data, "characters", "role.json"), "utf8"), "old-character");
-      assert.equal(fs.existsSync(secondTarget), false, "导入预检失败时不应安装程序文件");
+      const secondTarget = path.join(tmp, "已有数据导入测试");
+      assert.equal(spawnSync(setup, ["--silent", "--accept-license", `--dir=${secondTarget}`], { env, timeout: 30000 }).status, 0);
+      fs.mkdirSync(path.join(secondTarget, "data", "characters"), { recursive: true });
+      fs.writeFileSync(path.join(secondTarget, "data", "characters", "existing.json"), "preserve-existing");
+      assert.equal(spawnSync(setup, ["--silent", "--accept-license", `--dir=${secondTarget}`, `--import-dir=${oldData}`], { env, timeout: 30000 }).status, 0);
+      assert.equal(fs.readFileSync(path.join(secondTarget, "data", "characters", "existing.json"), "utf8"), "preserve-existing");
+      const redirectedSettings = path.join(secondTarget, edition === "tb" ? "心语TB设置.json" : "心语设置.json");
+      const redirected = JSON.parse(fs.readFileSync(redirectedSettings, "utf8")).dataDir;
+      assert.notEqual(redirected, path.join(secondTarget, "data"));
+      const importReceipt = JSON.parse(fs.readFileSync(path.join(redirected, "state", "migration-import.json")));
+      assert.equal(importReceipt.source.toLowerCase(), path.resolve(oldData).toLowerCase());
+      assert.equal(importReceipt.characters, 1);
+      assert.equal(importReceipt.destination.toLowerCase(), path.resolve(redirected).toLowerCase());
+      assert.equal(fs.readFileSync(path.join(redirected, "characters", "role.json"), "utf8"), "old-character");
+      assert.equal(spawnSync(setup, ["--silent", "--accept-license", `--dir=${secondTarget}`, `--import-dir=${redirected}`], { env, timeout: 30000 }).status, 0, "同源目标应保留数据并升级");
+
     } finally {
       if (launcher && launcher.exitCode === null) {
         if (headers) try { await fetch(`http://127.0.0.1:${port}/api/system/quit`, { method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: "{}", signal: AbortSignal.timeout(1000) }); } catch { /* 已退出 */ }

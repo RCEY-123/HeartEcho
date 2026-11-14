@@ -596,7 +596,7 @@ async function main() {
 
   await test("sec", "日志与接口不泄露密钥", () => {
     const { redact, redactText } = logMod;
-    const out = redact({ apiKey: "sk-selftest-fake-key-0123456789", nested: { accessToken: "aaaabbbbccccdddd" } });
+    const out = redact({ apiKey: "synthetic-selftest-key-0123456789", nested: { accessToken: "aaaabbbbccccdddd" } });
     assert(!JSON.stringify(out).includes("0123456789"), "长密钥应被打码");
     assert(!JSON.stringify(out).includes("aaaabbbbccccdddd"), "token 应被打码");
     const text = redactText("Authorization: Bearer sk-abcdefghijklmnop1234");

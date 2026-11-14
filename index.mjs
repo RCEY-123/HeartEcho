@@ -19,6 +19,7 @@
 // ⚠ 必须是第一个 import：它只解析 --instance 并把环境变量摆好，
 // 而 paths.mjs 在加载时就把目录算死了，晚一步就来不及。
 import "./lib/boot-env.mjs";
+import { runContinuity } from "./lib/continuity-runtime.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -39,8 +40,9 @@ import {
 } from "./lib/config.mjs";
 import { InteractionService } from "./lib/interactions.mjs";
 import { TbGroupService, TB_CHARACTER } from "./lib/tb.mjs";
-import { archiveExtendedDaily, memoryConsentValid } from "./lib/extended-memory.mjs";
+import { memoryConsentValid } from "./lib/extended-memory.mjs";
 import { startManagedHindsight } from "./lib/hindsight-runtime.mjs";
+import { UpdateManager } from "./lib/updates.mjs";
 import { getDb, closeDb, migrate, backup, integrityCheck, claimEventKey } from "./lib/db.mjs";
 import { OneBot, normalizeEvent, dataUrlFromLocalFile } from "./lib/onebot.mjs";
 import { LlmGateway } from "./lib/llm.mjs";
@@ -63,11 +65,12 @@ import {
   relaunchSelf,
   waitTrayReady,
 } from "./lib/desktop.mjs";
-import { diagnoseProtocol, ensureProtocol, startProtocol, stopProtocol, isPortListening } from "./lib/protocol.mjs";
+import { diagnoseProtocol, ensureProtocol, startProtocol, stopProtocol, isPortListening, recoverProtocolConnection } from "./lib/protocol.mjs";
+import { alignProtocolConnection } from "./lib/health.mjs";
 import { listSessions, scopeLabel } from "./lib/storage.mjs";
-import { archiveOnce, writeDiary } from "./lib/life.mjs";
+import { archiveOnce, writeDiary, writeDueDiaries, generateDailyLife } from "./lib/life.mjs";
 import { forecast as fetchWeather, summarize as summarizeWeather } from "./lib/weather.mjs";
-import { recoverMissedMessages } from "./lib/recovery.mjs";
+import { QQRecovery } from "./lib/qq-recovery.mjs";
 import { panelLaunchUrl } from "./lib/panel-auth.mjs";
 
 const argv = process.argv.slice(2);
@@ -204,6 +207,8 @@ async function main() {
   }
   // 第一次启动生成一个本机专用的协议端访问令牌（不写死公共值，见 config.mjs 注释）
   const tokenInfo = ensureLocalToken();
+  const aligned = alignProtocolConnection();
+  if (aligned.changed) log.info(`已自动对齐协议端连接：WebSocket ${aligned.wsPort}，HTTP ${aligned.httpPort || "未配置"}`);
   const cfg = getConfig();
   if (tokenInfo.created) log.info("已生成本机的协议端访问令牌（只保存在本地 config.json 里）");
   pruneLogs(14);
@@ -226,6 +231,7 @@ async function main() {
   const client = new OneBot({
     url: cfg.bot.onebotWsUrl,
     accessToken: cfg.bot.accessToken,
+    httpAccessToken: cfg.bot.httpAccessToken,
     httpUrl: cfg.bot.onebotHttpUrl,
     selfId: cfg.bot.selfId,
   });
@@ -342,7 +348,8 @@ async function main() {
   /* ---------------------------- 常驻模式 ---------------------------- */
 
   const bootCfg = getConfig();
-  const accountConfigured = /^[1-9]\d{4,11}$/.test(String(bootCfg.bot.selfId ?? ""));
+  let accountConfigured = /^[1-9]\d{4,11}$/.test(String(bootCfg.bot.selfId ?? ""));
+  const startupWarnings = [];
   const bootHost = bootCfg.bot.panelHost || "127.0.0.1";
   const bootPort = Number(bootCfg.bot.panelPort) || 5311;
 
@@ -397,23 +404,21 @@ async function main() {
       const where = holder.panelPort ? `（面板端口 ${holder.panelPort}）` : "";
       const message = `QQ ${bootCfg.bot.selfId} 已经在另一个实例「${holder.name}」${where}里跑着了。\n同一个账号只能开一个实例：同时登录会被互相顶下线，消息也会串。\n要同时聊两个角色，请给另一个角色配另一个 QQ 号（面板「QQ 账号 → 新增实例」）。`;
       log.error(message);
-      console.error(message);
-      closeDb();
-      process.exitCode = 1;
-      return;
+      startupWarnings.push("该 QQ 已在其他实例运行，本次暂停 QQ 接入。角色、历史数据和应用内对话仍可使用；退出旧实例后可重启以恢复 QQ。");
+      accountConfigured = false;
     }
     // 占住这个号：别的实例（哪怕目录是手动复制的）启动时就能看见
-    const claimed = claimAccount(bootCfg.bot.selfId, { dir: paths.app, dataDir: paths.data, panelPort: bootPort });
+    const claimed = accountConfigured ? claimAccount(bootCfg.bot.selfId, { dir: paths.app, dataDir: paths.data, panelPort: bootPort }) : { ok: true };
     if (!claimed.ok) {
       log.error(claimed.reason);
-      console.error(claimed.reason);
-      closeDb();
-      process.exitCode = 1;
-      return;
+      startupWarnings.push("该 QQ 的旧实例仍在后台，本次暂停 QQ 接入。数据已加载，应用内聊天可继续使用；请先退出旧实例再重启以恢复 QQ。");
+      accountConfigured = false;
     }
   } catch (error) {
     log.warn(`检查账号占用失败（不影响启动）：${error?.message ?? error}`);
-  } else log.warn("机器人 QQ 号还没设置，请在面板完成配置并重启");
+  } else log.info("未配置 QQ，可直接在面板「角色对话」中聊天；QQ 接入可稍后配置");
+  client.qqPaused = startupWarnings.length > 0;
+  if (client.qqPaused) client.status.lastError = startupWarnings[0];
 
   /* ---------------------- 开机自启：只在打包版自动登记 ---------------------- */
 
@@ -440,24 +445,21 @@ async function main() {
   if (cfg.bot.masterId) {
     log.info(`对方 QQ：${cfg.bot.masterId}（${cfg.bot.masterName}）`);
   } else {
-    log.warn("还没有设置对方的 QQ 号——面板「运行环境」里填一下，主动消息和记忆隔离都依赖它");
+    log.info("未设置对方 QQ；心语内的聊天、记忆与主动消息仍可使用");
   }
 
   client.on("connected", async () => {
-    const info = await client.getLoginInfo().catch(() => null);
-    if (info) {
-      client.status.nickname = info.nickname;
-      log.info(`已接管 QQ：${info.nickname}（${info.user_id}）`);
-    }
     audit({ eventType: "qq_connected", detail: { selfId: client.selfId, nickname: client.status.nickname } });
-    // 连上就补一遍历史：断线期间、重启期间对方发来的消息不至于凭空消失
-    recoverMissedMessages({ client, extraPeers: [String(cfg.bot.masterId || "")] })
-      .then((result) => {
-        if (result.added) log.info(`补回了 ${result.added} 条之前没接到的消息（不会触发回复，只补记录）`);
-        else log.debug("没有漏掉的消息");
-      })
-      .catch((error) => log.debug(`补历史消息失败（不影响正常收发）：${error?.message ?? error}`));
-    await greetIfNeeded();
+  });
+  const qqRecovery = new QQRecovery({ client, chat, reconnectTransport: async () => {
+    const result = await recoverProtocolConnection();
+    client.applyConfig(getConfig().bot);
+    if (!result.ok) log.debug(result.message);
+    return result;
+  } });
+  client.on("account-ready", () => {
+    scheduler.retryOpenGreeting().catch(error => log.warn(`首次打开问候未发出：${error.message}`));
+    greetIfNeeded().catch(error => log.warn(`问候失败：${error.message}`));
   });
 
   client.on("disconnected", () => {
@@ -469,10 +471,13 @@ async function main() {
     try {
       const now = getConfig();
       if (!now.chat.greetOnFirstConnect) return;
+      if (now.greet.firstOpen?.enabled && now.greet.firstOpen.channel === "qq") return;
       const master = String(now.bot.masterId || "");
       if (!master) return;
       const done = getDb().prepare("select value from meta where key = 'greeted_at'").get();
       if (done) return;
+      // 导入旧会话或刚完成断线补答时，不再插入首次问候。
+      if (getDb().prepare("select 1 from messages where scope_key = ? limit 1").get(`private_${master}`)) return;
       const text = (character.greeting || `${now.bot.masterName}，我在的哦。`).trim();
       await client.sendPrivateMsg(master, text, { idempotencyKey: `first-greet:${master}` });
       const { insertMessage, ensureSession } = await import("./lib/storage.mjs");
@@ -518,7 +523,7 @@ async function main() {
   });
 
   const apiHost = cfg.bot.panelHost || "127.0.0.1";
-  const apiPort = Number(cfg.bot.panelPort) || 5311;
+  let apiPort = Number(cfg.bot.panelPort) || 5311;
 
   // 面板上的「重启 / 退出」按钮最终落到这两个函数上（server 先建、shutdown 后定义，用可变引用串起来）
   let shutdownFn = null;
@@ -539,7 +544,10 @@ async function main() {
     log.error(`扩展装载失败（不影响机器人本体）：${error?.message ?? error}`);
   }
 
+  const updates = new UpdateManager({ quit: () => shutdownFn?.("安装应用更新") });
   const server = createApiServer({
+    startupWarnings,
+    updates,
     client,
     llm,
     chat,
@@ -553,6 +561,7 @@ async function main() {
     log,
     control,
     tb,
+    qqRecovery,
   });
 
   let listenError = null;
@@ -563,15 +572,38 @@ async function main() {
       await new Promise((resolve) => setTimeout(resolve, 400));
     }
   }
-  await server.listen(apiPort, apiHost).catch((error) => {
-    listenError = String(error?.message ?? error);
-  });
+  try {
+    await server.listen(apiPort, apiHost);
+  } catch (error) {
+    if (error.code === "EADDRINUSE") {
+      try {
+        await server.listen(0, apiHost);
+        const previousPort = apiPort;
+        apiPort = server.server.address().port;
+        saveConfig({ bot: { panelPort: apiPort } });
+        startupWarnings.push("原面板端口 " + previousPort + " 被其他程序占用，已自动改为 " + apiPort + " 并保存。当前窗口使用的是本实例的数据。");
+        if (accountConfigured) {
+          const { claimAccount } = await import("./lib/instances.mjs");
+          claimAccount(bootCfg.bot.selfId, { dir: paths.app, dataDir: paths.data, panelPort: apiPort });
+        }
+      } catch (fallbackError) { listenError = String(fallbackError?.message ?? fallbackError); }
+    } else listenError = String(error?.message ?? error);
+  }
   if (listenError) {
     log.error(`控制面板启动失败（端口 ${apiPort} 可能被占用）：${listenError}`);
-    log.error("可以改「心语设置.json」里的面板端口，或者直接让机器人继续跑（QQ 功能不受影响）");
+    log.error("面板无法启动，本次启动已停止。请检查日志中的地址与端口设置后重试。");
+    server.close();
+    extensions.dispose();
+    releaseLock();
+    closeDb();
+    process.exitCode = 1;
+    return;
   } else {
     log.info(`控制面板已就绪：http://${apiHost}:${apiPort}`);
   }
+
+  // 不等待协议端登录或记忆服务启动；每次进程启动都独立检查，失败由面板明确提示。
+  if (process.env.HEARTECHO_UPDATE_CHECK !== "0" && !process.env.NODE_TEST_CONTEXT) updates.check().catch(() => {});
 
   // 先把协议端安排好，再连 QQ：否则用户只看到「未连接」，不知道是协议端没起
   if (!accountConfigured) {
@@ -593,10 +625,17 @@ async function main() {
     if (!quick.running) log.warn(`协议端没在运行（${quick.nextAction}）；自动启动已关闭`);
   }
 
+  // 首次启动还没配置QQ的用户，稍后在面板接入时也必须拥有持续恢复检查。
+  qqRecovery.start();
   if (accountConfigured) {
+    client.applyConfig(getConfig().bot);
     client.start();
-    scheduler.start();
     qzoneScheduler.start();
+  }
+
+  scheduler.start();
+  if (getConfig().nextMemory.enabled && getConfig().nextMemory.mode !== "local" && getConfig().nextMemory.managed && memoryConsentValid()) {
+    startManagedHindsight().catch((error) => log.warn(`Hindsight 启动失败（聊天仍可使用）：${error.message}`));
   }
 
   // 天气：启动时先把缓存预热一次，这样聊天里她随时能提到「今天下雨」（失败的代价只是没有天气，不影响别的）
@@ -624,28 +663,31 @@ async function main() {
   lifeTimer.unref?.();
   const extendedTimer = setInterval(() => {
     if (pauseState.paused) return;
-    archiveExtendedDaily(llm).catch((error) => log.warn(`每日记忆归档失败：${error.message}`));
+    runContinuity(llm).catch((error) => log.warn(`数字生命整理失败：${error.message}`));
+    if (getConfig().life.simulated.enabled) generateDailyLife({ llm, character: activeCharacter() }).catch((error) => log.warn(`她的日常暂未写下：${error.message}`));
     for (const [gid, settings] of Object.entries(getConfig().tb.groups)) {
       if (getConfig().tb.enabled && settings.enabled && settings.source !== "custom") tb.refreshRules(gid).catch(() => {});
     }
   }, 300000);
   extendedTimer.unref?.();
+  const continuityStart = setTimeout(() => { if (!pauseState.paused) runContinuity(llm).catch(error => log.warn(`数字生命启动整理失败：${error.message}`)); }, 15000);
+  continuityStart.unref?.();
   if (getConfig().nextMemory.enabled && memoryConsentValid() && getConfig().nextMemory.baseUrl.replace(/\/$/, "") === "http://127.0.0.1:8888") {
     startManagedHindsight().catch((error) => log.warn(`记忆服务未启动，继续使用本地能力：${error.message}`));
   }
 
+  let diaryRunning = false;
   const diaryTimer = setInterval(() => {
+    if (pauseState.paused || diaryRunning) return;
     const now = getConfig();
     if (now.life?.diary?.enabled === false) return;
-    if (now.nextMemory.enabled) return;
     const [hour, minute] = String(now.life?.diary?.at ?? "22:30").split(":").map(Number);
     const date = new Date();
-    if (date.getHours() !== hour || date.getMinutes() < minute) return;
-    const key = `diary:${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
-    if (!claimEventKey(key)) return;
-    writeDiary({ llm, character: activeCharacter(), masterId: now.bot.masterId, masterName: now.bot.masterName }).catch((error) =>
+    if (date.getHours() * 60 + date.getMinutes() < hour * 60 + minute) return;
+    diaryRunning = true;
+    writeDueDiaries({ llm, character: activeCharacter(), masterId: now.bot.masterId, masterName: now.bot.masterName, date }).catch((error) =>
       log.warn(`定时写日记失败：${error?.message ?? error}`),
-    );
+    ).finally(() => { diaryRunning = false; });
   }, 60000);
   diaryTimer.unref?.();
 
@@ -684,9 +726,11 @@ async function main() {
     shuttingDown = true;
     log.warn(`${signal}，正在退出…`);
     try {
+      qqRecovery.stop();
       chat.stop();
       tb.stop();
       clearInterval(extendedTimer);
+      clearTimeout(continuityStart);
       scheduler.stop();
       qzoneScheduler.stop();
       extensions.dispose();
@@ -696,7 +740,7 @@ async function main() {
       client.stop();
       // 重启时把协议端留着（省一次重新登录的等待），彻底退出时才一起关掉，
       // 否则用户点「退出心语」之后后台还挂着一个 QQ 连接，不知道该怎么收场。
-      if (!options.keepProtocol) {
+      if (!options.keepProtocol && !client.qqPaused) {
         const stopped = await stopProtocol();
         if (stopped.stopped) log.info("已顺便停掉心语自己拉起来的协议端");
       }

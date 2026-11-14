@@ -92,7 +92,7 @@ for (const tb of [false, true]) test(`${tb ? "TB" : "通用版"}首次配置时�
   }
 });
 
-const exe = fileURLToPath(new URL("../dist/心语.exe", import.meta.url));
+const exe = process.env.HEARTECHO_TEST_EXE || fileURLToPath(new URL("../dist/心语.exe", import.meta.url));
 test("便携 exe 自检不会使用现有数据目录", { timeout: 30000, skip: !fs.existsSync(exe) }, () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "heartecho-sea-selftest-"));
   try {

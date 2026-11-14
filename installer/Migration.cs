@@ -6,9 +6,59 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Web.Script.Serialization;
 
-// 旧数据只复制到空目录，绝不删除或覆盖来源。
+// 识别旧安装目录或数据目录；只复制到空目录，绝不覆盖来源。
 internal static class Migration
 {
+    internal static int CharacterCount(string dir)
+    {
+        string roles = Path.Combine(dir, "characters");
+        if (!Directory.Exists(roles)) return 0;
+        PathGuard.RejectReparseAncestors(roles);
+        return Directory.GetFiles(roles, "*.json", SearchOption.TopDirectoryOnly).Length;
+    }
+
+    internal static string Describe(string dir)
+    {
+        string database = Path.Combine(dir, "database", "main.db");
+        long bytes = File.Exists(database) ? new FileInfo(database).Length : 0;
+        return CharacterCount(dir) + " 个角色；数据库 " + (bytes / 1024.0 / 1024.0).ToString("0.00") + " MB";
+    }
+
+    private static bool IsData(string dir)
+    {
+        return Directory.Exists(dir) && (File.Exists(Path.Combine(dir, "config.json")) ||
+            File.Exists(Path.Combine(dir, "database", "main.db")) || Directory.Exists(Path.Combine(dir, "characters")));
+    }
+
+    internal static string ResolveSource(string selected)
+    {
+        string root = Path.GetFullPath(selected);
+        if (File.Exists(root) && Path.GetExtension(root).Equals(".exe", StringComparison.OrdinalIgnoreCase)) root = Path.GetDirectoryName(root);
+        PathGuard.RejectReparseAncestors(root);
+        if (IsData(root) && CharacterCount(root) > 0) return root;
+        var candidates = new List<string>();
+        foreach (string name in new[] { "心语设置.json", "心语TB设置.json" }) {
+            string configured = InstallCore.SettingsDataDir(Path.Combine(root, name));
+            if (configured.Length > 0) candidates.Add(Path.GetFullPath(Path.IsPathRooted(configured) ? configured : Path.Combine(root, configured)));
+        }
+        string marker = Path.Combine(root, "INSTALL-EDITION.txt");
+        if (File.Exists(marker)) {
+            string local = Environment.GetEnvironmentVariable("LOCALAPPDATA") ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            if (File.ReadAllText(marker).Trim() == "tb") {
+                string configured = InstallCore.SettingsDataDir(Path.Combine(local, "心语TB", "心语TB设置.json"));
+                candidates.Add(configured.Length == 0 ? Path.Combine(local, "心语TB", "data") : Path.GetFullPath(Path.IsPathRooted(configured) ? configured : Path.Combine(root, configured)));
+            } else candidates.Add(Path.Combine(local, "心语"));
+        }
+        candidates.Add(Path.Combine(root, "data"));
+        candidates.Add(Path.Combine(root, "dist", "data"));
+        candidates.Add(Path.Combine(root, "data-export"));
+        foreach (string candidate in candidates) {
+            PathGuard.RejectReparseAncestors(candidate);
+            if (IsData(candidate) && CharacterCount(candidate) > 0) return candidate;
+        }
+        throw new IOException("这里没有找到旧角色。仅有初始化配置或空数据库的目录不能导入。请选择你以前使用的心语.exe、它所在的文件夹、含角色JSON的数据目录，或完整迁移导出目录。原数据不会被修改。");
+    }
+
     internal sealed class Prepared : IDisposable
     {
         private readonly string source;
@@ -27,8 +77,35 @@ internal static class Migration
                 if ((File.GetAttributes(destination) & FileAttributes.ReparsePoint) != 0) throw new IOException("目标数据目录不能是链接");
                 Directory.Delete(destination, false);
             }
-            Directory.Move(stage, destination);
+            try { Directory.Move(stage, destination); }
+            catch (IOException) { CommitByCopy(); }
+            catch (UnauthorizedAccessException) { CommitByCopy(); }
             committed = true;
+            string state = Path.Combine(destination, "state");
+            PathGuard.RejectReparseAncestors(state);
+            Directory.CreateDirectory(state);
+            string receipt = Path.Combine(state, "migration-import.json");
+            PathGuard.RejectReparseAncestors(receipt);
+            var json = new JavaScriptSerializer();
+            File.WriteAllText(receipt, json.Serialize(new {
+                source = source, destination = destination,
+                characters = CharacterCount(destination),
+                importedAt = DateTime.UtcNow.ToString("o")
+            }));
+        }
+        private void CommitByCopy()
+        {
+            // EFS加密目录、重定向用户目录等文件系统可能拒绝目录重命名。
+            // 只向尚不存在的目标完整复制；失败不启动应用、不修改来源。
+            if (!Directory.Exists(stage) || Directory.Exists(destination) || File.Exists(destination)) throw new IOException("无法提交导入：目标已变化或暂存目录不可用");
+            try {
+                CopyTree(stage, destination);
+                if (CharacterCount(destination) != CharacterCount(stage)) throw new IOException("导入角色校验失败");
+            } catch {
+                if (Directory.Exists(destination)) Directory.Delete(destination, true);
+                throw;
+            }
+            Directory.Delete(stage, true);
         }
         public void Dispose()
         {
@@ -79,34 +156,41 @@ internal static class Migration
                 File.Copy(item, to, false);
                 var after = new FileInfo(item);
                 if (length != after.Length || modified != after.LastWriteTimeUtc) throw new IOException("复制时旧数据发生变化，请关闭旧程序后重试：" + item);
+                using (var hash = SHA256.Create())
+                using (var original = File.OpenRead(item))
+                using (var copied = File.OpenRead(to))
+                    if (Convert.ToBase64String(hash.ComputeHash(original)) != Convert.ToBase64String(hash.ComputeHash(copied))) throw new IOException("迁移文件校验失败，原数据已保留：" + item);
             }
         }
     }
 
-    internal static Prepared Prepare(string source, string destination)
+    internal static Prepared Prepare(string source, string destination, bool exact = false, string stagingParent = null)
     {
-        string from = Path.GetFullPath(source).TrimEnd(Path.DirectorySeparatorChar);
+        string from = (exact ? Path.GetFullPath(source) : ResolveSource(source)).TrimEnd(Path.DirectorySeparatorChar);
         string to = Path.GetFullPath(destination).TrimEnd(Path.DirectorySeparatorChar);
         if (String.IsNullOrEmpty(Path.GetDirectoryName(from)) || String.IsNullOrEmpty(Path.GetDirectoryName(to)))
             throw new IOException("不能将磁盘根目录用作数据导入路径");
         PathGuard.RejectReparseAncestors(from);
         PathGuard.RejectReparseAncestors(to);
         if (!Directory.Exists(from)) throw new IOException("旧数据目录不存在");
-        if (SameOrChild(from, to) || SameOrChild(to, from)) throw new IOException("旧数据目录和目标目录不能相同或互相包含");
+        if (String.Equals(from, to, StringComparison.OrdinalIgnoreCase)) { EnsureNotRunning(from); return null; }
+        if (SameOrChild(from, to) || SameOrChild(to, from)) throw new IOException("旧数据目录和目标目录不能互相包含");
         if (!File.Exists(Path.Combine(from, "config.json")) && !Directory.Exists(Path.Combine(from, "characters")) && !Directory.Exists(Path.Combine(from, "database")))
             throw new IOException("所选目录不像心语数据目录，请选择包含 config.json、characters 或 database 的目录");
         if (File.Exists(to) || (Directory.Exists(to) && Directory.GetFileSystemEntries(to).Length != 0))
             throw new IOException("目标数据目录已有内容，不会覆盖；请先备份并选择空目录");
         if (Directory.Exists(to) && (File.GetAttributes(to) & FileAttributes.ReparsePoint) != 0) throw new IOException("目标数据目录不能是链接");
         EnsureNotRunning(from);
-        string parent = Path.GetDirectoryName(to);
+        string parent = String.IsNullOrWhiteSpace(stagingParent) ? Path.GetDirectoryName(to) : Path.GetFullPath(stagingParent);
         if (String.IsNullOrEmpty(parent)) throw new IOException("目标数据目录无效");
+        PathGuard.RejectReparseAncestors(parent);
         Directory.CreateDirectory(parent);
         string stage = Path.Combine(parent, ".heartecho-import-" + Guid.NewGuid().ToString("N"));
         try
         {
             CopyTree(from, stage);
             EnsureNotRunning(from);
+            if (CharacterCount(stage) != CharacterCount(from)) throw new IOException("导入角色数量校验失败，原数据已保留");
             return new Prepared(from, to, stage);
         }
         catch
@@ -118,6 +202,6 @@ internal static class Migration
 
     internal static void CopyFrom(string source, string destination)
     {
-        using (Prepared prepared = Prepare(source, destination)) prepared.Commit();
+        using (Prepared prepared = Prepare(source, destination)) if (prepared != null) prepared.Commit();
     }
 }
